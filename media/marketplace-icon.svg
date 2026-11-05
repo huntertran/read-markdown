@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7a3f63"/><stop offset="1" stop-color="#53294a"/></linearGradient>
+    <clipPath id="l"><circle cx="45" cy="80" r="17"/></clipPath>
+    <clipPath id="r"><circle cx="85" cy="80" r="17"/></clipPath>
+  </defs>
+  <rect width="128" height="128" rx="26" fill="url(#bg)"/>
+  <rect x="24" y="14" width="80" height="96" rx="7" fill="#fbf6ea"/>
+  <rect x="32" y="24" width="44" height="7" rx="3" fill="#53294a"/>
+  <g fill="#c9c2b2">
+    <rect x="32" y="38" width="62" height="4" rx="2"/>
+    <rect x="32" y="47" width="56" height="4" rx="2"/>
+    <rect x="32" y="56" width="60" height="4" rx="2"/>
+    <rect x="32" y="66" width="62" height="4" rx="2"/>
+    <rect x="32" y="76" width="50" height="4" rx="2"/>
+    <rect x="32" y="86" width="60" height="4" rx="2"/>
+    <rect x="32" y="96" width="40" height="4" rx="2"/>
+  </g>
+  <!-- magnified text inside the lenses -->
+  <g clip-path="url(#l)"><circle cx="45" cy="80" r="17" fill="#ffffff"/><rect x="24" y="70" width="60" height="6" rx="3" fill="#6f6a5d"/><rect x="24" y="83" width="50" height="6" rx="3" fill="#6f6a5d"/></g>
+  <g clip-path="url(#r)"><circle cx="85" cy="80" r="17" fill="#ffffff"/><rect x="64" y="70" width="60" height="6" rx="3" fill="#6f6a5d"/><rect x="64" y="83" width="40" height="6" rx="3" fill="#6f6a5d"/></g>
+  <g fill="none" stroke="#2b1a27" stroke-width="5.5" stroke-linecap="round">
+    <circle cx="45" cy="80" r="17"/>
+    <circle cx="85" cy="80" r="17"/>
+    <path d="M60 76 Q65 70 70 76"/>
+    <path d="M28 76 L14 66"/>
+    <path d="M102 76 L116 66"/>
+  </g>
+</svg>

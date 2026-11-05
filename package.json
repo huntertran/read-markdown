@@ -5,6 +5,7 @@
   "version": "0.1.0",
   "publisher": "huntertran",
   "license": "GPL-3.0-only",
+  "icon": "media/icon.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/huntertran/read-markdown"
