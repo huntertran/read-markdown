@@ -1,0 +1,447 @@
+{
+  "name": "read-markdown",
+  "displayName": "Read Markdown",
+  "description": "A reading-focused Markdown preview for long documents: heading navigation, collapsible sections, typography customization, search highlight sync, Mermaid and code highlighting.",
+  "version": "0.1.0",
+  "publisher": "huntertran",
+  "license": "GPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/huntertran/read-markdown"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Visualization",
+    "Other"
+  ],
+  "keywords": [
+    "markdown",
+    "preview",
+    "reader",
+    "toc",
+    "mermaid"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onLanguage:markdown",
+    "onWebviewPanel:readMarkdown.preview"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "readMarkdown.openPreview",
+        "title": "Open Preview",
+        "category": "Read Markdown",
+        "icon": "$(book)"
+      },
+      {
+        "command": "readMarkdown.openPreviewToSide",
+        "title": "Open Preview to the Side",
+        "category": "Read Markdown",
+        "icon": "$(book)"
+      },
+      {
+        "command": "readMarkdown.toggleNav",
+        "title": "Toggle Quick Navigation",
+        "category": "Read Markdown"
+      },
+      {
+        "command": "readMarkdown.showSource",
+        "title": "Show Source",
+        "category": "Read Markdown",
+        "icon": "$(go-to-file)"
+      }
+    ],
+    "customEditors": [
+      {
+        "viewType": "readMarkdown.editor",
+        "displayName": "Read Markdown Preview",
+        "selector": [
+          {
+            "filenamePattern": "*.md"
+          },
+          {
+            "filenamePattern": "*.markdown"
+          }
+        ],
+        "priority": "option"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "readMarkdown.openPreview",
+        "key": "ctrl+shift+v",
+        "mac": "cmd+shift+v",
+        "when": "editorLangId == markdown && config.readMarkdown.preview.replaceDefault"
+      },
+      {
+        "command": "readMarkdown.openPreviewToSide",
+        "key": "ctrl+k v",
+        "mac": "cmd+k v",
+        "when": "editorLangId == markdown && config.readMarkdown.preview.replaceDefault"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "readMarkdown.openPreviewToSide",
+          "when": "editorLangId == markdown && !notebookEditorFocused",
+          "group": "navigation"
+        },
+        {
+          "command": "readMarkdown.showSource",
+          "when": "activeWebviewPanelId == 'readMarkdown.preview' || activeCustomEditorId == 'readMarkdown.editor'",
+          "group": "navigation"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "readMarkdown.openPreview",
+          "when": "resourceLangId == markdown",
+          "group": "navigation"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "readMarkdown.openPreview",
+          "when": "resourceLangId == markdown",
+          "group": "1_open"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "readMarkdown.showSource",
+          "when": "activeWebviewPanelId == 'readMarkdown.preview' || activeCustomEditorId == 'readMarkdown.editor'"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Read Markdown",
+      "properties": {
+        "readMarkdown.preview.replaceDefault": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Use Read Markdown for `Ctrl+Shift+V` / `Ctrl+K V` instead of the built-in Markdown preview.",
+          "order": 0
+        },
+        "readMarkdown.preview.autoOpen": {
+          "type": "string",
+          "enum": [
+            "off",
+            "beside",
+            "active"
+          ],
+          "enumDescriptions": [
+            "Do not open the preview automatically.",
+            "Open the preview beside the editor when a Markdown file is opened.",
+            "Open the preview in the same editor group when a Markdown file is opened."
+          ],
+          "default": "off",
+          "description": "Automatically open the preview when a Markdown file is opened.",
+          "order": 1
+        },
+        "readMarkdown.preview.scrollSync": {
+          "type": "boolean",
+          "default": true,
+          "description": "Synchronize scrolling between the Markdown source and the preview.",
+          "order": 2
+        },
+        "readMarkdown.nav.show": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the quick navigation sidebar (headings outline).",
+          "order": 10
+        },
+        "readMarkdown.nav.position": {
+          "type": "string",
+          "enum": [
+            "left",
+            "right"
+          ],
+          "default": "left",
+          "description": "Position of the quick navigation sidebar.",
+          "order": 11
+        },
+        "readMarkdown.nav.maxDepth": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6,
+          "default": 3,
+          "description": "Deepest heading level shown in the quick navigation.",
+          "order": 12
+        },
+        "readMarkdown.nav.width": {
+          "type": "integer",
+          "minimum": 120,
+          "maximum": 600,
+          "default": 260,
+          "description": "Width of the quick navigation sidebar in pixels.",
+          "order": 13
+        },
+        "readMarkdown.theme.preset": {
+          "type": "string",
+          "enum": [
+            "vscode",
+            "light",
+            "dark",
+            "sepia",
+            "high-contrast"
+          ],
+          "enumDescriptions": [
+            "Follow the current VS Code color theme.",
+            "Light paper-like theme.",
+            "Dark theme.",
+            "Warm sepia theme, easy on the eyes for long reads.",
+            "High contrast theme."
+          ],
+          "default": "vscode",
+          "description": "Base color preset. Individual color settings override it.",
+          "order": 20
+        },
+        "readMarkdown.body.fontFamily": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Font family for body text. Empty uses the preset default (system UI font).",
+          "order": 21
+        },
+        "readMarkdown.body.fontSize": {
+          "type": "number",
+          "minimum": 8,
+          "maximum": 40,
+          "default": 15,
+          "description": "Body font size in pixels.",
+          "order": 22
+        },
+        "readMarkdown.body.lineHeight": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 3,
+          "default": 1.65,
+          "description": "Body line height (unitless multiplier).",
+          "order": 23
+        },
+        "readMarkdown.body.maxWidth": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 860,
+          "description": "Maximum content width in pixels. 0 means full width.",
+          "order": 24
+        },
+        "readMarkdown.body.backgroundColor": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Background color (any CSS color). Empty uses the preset.",
+          "order": 25
+        },
+        "readMarkdown.body.textColor": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Text color (any CSS color). Empty uses the preset.",
+          "order": 26
+        },
+        "readMarkdown.headings.fontFamily": {
+          "type": "string",
+          "default": "",
+          "description": "Font family for headings. Empty uses the body font.",
+          "order": 30
+        },
+        "readMarkdown.headings.scale": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 3,
+          "default": 1,
+          "description": "Multiplier applied to all default heading sizes.",
+          "order": 31
+        },
+        "readMarkdown.headings.fontSizes": {
+          "type": "object",
+          "default": {},
+          "properties": {
+            "h1": {
+              "type": "string"
+            },
+            "h2": {
+              "type": "string"
+            },
+            "h3": {
+              "type": "string"
+            },
+            "h4": {
+              "type": "string"
+            },
+            "h5": {
+              "type": "string"
+            },
+            "h6": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "markdownDescription": "Per-level font size overrides as CSS values, e.g. `{ \"h1\": \"2.4em\", \"h2\": \"22px\" }`. Overrides `headings.scale`.",
+          "order": 32
+        },
+        "readMarkdown.headings.colors": {
+          "type": "object",
+          "default": {},
+          "properties": {
+            "h1": {
+              "type": "string"
+            },
+            "h2": {
+              "type": "string"
+            },
+            "h3": {
+              "type": "string"
+            },
+            "h4": {
+              "type": "string"
+            },
+            "h5": {
+              "type": "string"
+            },
+            "h6": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "markdownDescription": "Per-level heading colors, e.g. `{ \"h1\": \"#d73a49\", \"h2\": \"#005cc5\" }`.",
+          "order": 33
+        },
+        "readMarkdown.headings.highlight": {
+          "type": "string",
+          "enum": [
+            "none",
+            "underline",
+            "background",
+            "leftBorder"
+          ],
+          "default": "underline",
+          "description": "Visual highlight style for H1/H2/H3 headings.",
+          "order": 34
+        },
+        "readMarkdown.headings.highlightColor": {
+          "type": "string",
+          "default": "",
+          "description": "Color used by the heading highlight style. Empty uses the preset accent color.",
+          "order": 35
+        },
+        "readMarkdown.customCss.inline": {
+          "type": "string",
+          "default": "",
+          "editPresentation": "multilineText",
+          "description": "Custom CSS appended after all built-in styles.",
+          "order": 40
+        },
+        "readMarkdown.customCss.files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Paths to CSS files (absolute, or relative to the first workspace folder) appended after built-in styles. Files are watched for changes.",
+          "order": 41
+        },
+        "readMarkdown.search.syncSelection": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Highlight the text selected in the Markdown source (including matches you step through with the Find widget, `Enter`/`F3`) in the preview.",
+          "order": 50
+        },
+        "readMarkdown.search.caseSensitive": {
+          "type": "boolean",
+          "default": false,
+          "description": "Match highlighted text case-sensitively.",
+          "order": 51
+        },
+        "readMarkdown.search.minLength": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 2,
+          "description": "Minimum selection length that triggers highlighting.",
+          "order": 52
+        },
+        "readMarkdown.search.highlightColor": {
+          "type": "string",
+          "default": "",
+          "description": "Background color of matches. Empty uses the theme find-match color.",
+          "order": 53
+        },
+        "readMarkdown.search.currentHighlightColor": {
+          "type": "string",
+          "default": "",
+          "description": "Background color of the current match. Empty uses the theme current find-match color.",
+          "order": 54
+        },
+        "readMarkdown.table.headerBackgroundColor": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Background color of table header cells, e.g. `#2d4a6b`. Empty uses a tint of the theme accent color.",
+          "order": 60
+        },
+        "readMarkdown.table.headerTextColor": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Text color of table header cells. Empty uses the body text color.",
+          "order": 61
+        },
+        "readMarkdown.code.copyButton": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a copy button on code blocks.",
+          "order": 60
+        },
+        "readMarkdown.mermaid.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Render ```mermaid code blocks as diagrams.",
+          "order": 61
+        },
+        "readMarkdown.sections.collapsible": {
+          "type": "boolean",
+          "default": true,
+          "description": "Allow collapsing the content under each heading.",
+          "order": 70
+        },
+        "readMarkdown.sections.startCollapsedBelowLevel": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 6,
+          "default": 0,
+          "description": "Start with sections at this heading level and deeper collapsed (e.g. 3 collapses H3-H6). 0 disables.",
+          "order": 71
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run check-types && node esbuild.mjs --production",
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "check-types": "tsc --noEmit -p . && tsc --noEmit -p webview",
+    "pretest": "npm run build && node esbuild.mjs --tests",
+    "test": "npm run test:unit && npm run test:integration",
+    "test:unit": "mocha \"out/test/unit/**/*.test.js\"",
+    "test:integration": "vscode-test",
+    "package": "vsce package"
+  },
+  "dependencies": {
+    "highlight.js": "^11.12.0",
+    "markdown-it": "^15.0.3",
+    "markdown-it-footnote": "^4.0.0",
+    "markdown-it-task-lists": "^2.1.1",
+    "mermaid": "^12.3.0"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^20.19.43",
+    "@types/vscode": "~1.90.0",
+    "@vscode/test-cli": "^0.0.15",
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^4.1.0",
+    "esbuild": "^0.28.2",
+    "mocha": "^12.0.3",
+    "typescript": "^7.0.2"
+  }
+}
