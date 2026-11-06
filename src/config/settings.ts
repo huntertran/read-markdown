@@ -102,6 +102,9 @@ export function validateQuickSetting(key: string, value: unknown): unknown {
       return value === 'left' || value === 'right' ? value : undefined;
     case 'nav.maxDepth':
       return Number.isInteger(value) ? inRange(1, 6) : undefined;
+    case 'nav.width':
+      // '' resets to the default (double-click on the resize handle).
+      return value === '' ? value : Number.isInteger(value) ? inRange(120, 600) : undefined;
     case 'theme.preset':
       return typeof value === 'string' && PRESETS.includes(value) ? value : undefined;
     case 'body.fontSize':

@@ -178,7 +178,7 @@
           "minimum": 120,
           "maximum": 600,
           "default": 260,
-          "description": "Width of the quick navigation sidebar in pixels.",
+          "description": "Width of the quick navigation sidebar in pixels. You can also drag the sidebar edge in the preview (double-click it to reset).",
           "order": 13
         },
         "readMarkdown.theme.preset": {

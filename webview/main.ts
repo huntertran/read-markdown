@@ -3,6 +3,7 @@ import { $, getState, patchState, post } from './api';
 import { decorateCodeBlocks, initCodeBlocks } from './codeblocks';
 import { renderMermaid, rerenderMermaid } from './mermaid';
 import { initNav, setHeadings, updateActive } from './nav';
+import { initNavResize, syncNavWidth } from './navResize';
 import { sanitize } from './sanitize';
 import { initScrollMap, invalidate, isSuppressed, lineAtTop, scrollProgrammatically, scrollToLine, updateAnchor } from './scroll';
 import { initSearch, reapplySearch, setSearch } from './search';
@@ -50,6 +51,7 @@ function applyConfig(msg: Extract<ToWebview, { type: 'config' }>): void {
   body.dataset.preset = ui.preset;
   updateScheme();
   updateSettingsPanel(ui);
+  syncNavWidth();
   invalidate();
 
   const needsRerender =
@@ -229,5 +231,6 @@ initNav({
   content,
   onNavigate: revealHeading,
 });
+initNavResize($('rm-nav'), $('rm-nav-resizer'));
 patchState({});
 post({ type: 'ready' });

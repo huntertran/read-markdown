@@ -61,6 +61,45 @@ body[data-nav-position='right'] #rm-nav {
   border-left: 1px solid var(--rm-border);
 }
 
+/* Resize handle centred on the outline border; negative margins keep it out of the layout. */
+#rm-nav-resizer {
+  display: none;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  align-self: flex-start;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  width: 6px;
+  height: 100vh;
+  margin: 0 -3px;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+  transition: background-color 0.1s ease-out;
+}
+
+body.rm-nav-visible #rm-nav-resizer {
+  display: block;
+}
+
+#rm-nav-resizer:hover,
+#rm-nav-resizer:focus-visible,
+body.rm-nav-resizing #rm-nav-resizer {
+  background: var(--vscode-sash-hoverBorder, var(--vscode-focusBorder, rgba(0, 120, 212, 0.6)));
+  transition-delay: 0.3s;
+}
+
+body.rm-nav-resizing #rm-nav-resizer,
+#rm-nav-resizer:focus-visible {
+  transition-delay: 0s;
+}
+
+body.rm-nav-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
 #rm-main {
   flex: 1;
   min-width: 0;
@@ -472,8 +511,14 @@ body.rm-nav-visible[data-nav-position='right'] #rm-settings {
   padding: 0.15em 0.4em;
   font-family: var(--rm-mono);
   font-size: 0.86em;
+  color: var(--rm-code-fg, var(--rm-fg));
   background: var(--rm-code-bg);
   border-radius: 4px;
+}
+
+/* Inline code in a link keeps the link color. */
+.rm-markdown a > code {
+  color: inherit;
 }
 
 /* Code blocks */
@@ -491,6 +536,8 @@ body.rm-nav-visible[data-nav-position='right'] #rm-settings {
 
 .rm-markdown pre.rm-code > code {
   font-family: inherit;
+  /* Override VS Code's webview default (`code { color: textPreformat-foreground }`). */
+  color: inherit;
   white-space: pre;
   background: none;
   padding: 0;
@@ -825,7 +872,8 @@ body[data-scheme='dark'] .hljs-deletion { color: #ffdcd7; background: #67060c; }
     padding: 20px 44px 50vh 28px;
   }
 
-  body.rm-nav-visible #rm-nav {
+  body.rm-nav-visible #rm-nav,
+  body.rm-nav-visible #rm-nav-resizer {
     display: none;
   }
 
@@ -855,6 +903,7 @@ body[data-scheme='dark'] .hljs-deletion { color: #ffdcd7; background: #67060c; }
 
 @media print {
   #rm-nav,
+  #rm-nav-resizer,
   #rm-toolbar,
   #rm-settings,
   .rm-fold,

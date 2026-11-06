@@ -18,6 +18,8 @@ export class PreviewPanel implements vscode.Disposable {
   private lastRender: RenderResult | undefined;
   private lastHighlightKey = '';
   private pendingLine: number | undefined;
+  /** Set while hidden; VS Code may wrongly re-show a closed find widget when the panel returns. */
+  private findMayBeStale = false;
   /** Ignore webview-originated scroll messages until this time (ms) to avoid feedback loops. */
   ignorePreviewScrollUntil = 0;
 
@@ -35,7 +37,19 @@ export class PreviewPanel implements vscode.Disposable {
       panel.webview.onDidReceiveMessage((m: FromWebview) => this.onMessage(m)),
       panel.onDidDispose(() => this.dispose()),
       panel.onDidChangeViewState(({ webviewPanel }) => {
-        if (webviewPanel.active) manager.setActive(this);
+        if (!webviewPanel.visible) this.findMayBeStale = true;
+        if (webviewPanel.active) {
+          manager.setActive(this);
+          if (this.findMayBeStale) {
+            this.findMayBeStale = false;
+            // VS Code bug: closing the webview find widget from inside it (× button, possibly Escape) does not reset the
+            // `webviewFindWidgetVisible` context key, so the widget is re-shown when the hidden
+            // webview is restored. Close it again; the command only acts on the active webview.
+            // https://github.com/microsoft/vscode/issues/307943
+            // TODO: remove this workaround (and `findMayBeStale`) once `engines.vscode` >= the fixed version.
+            void vscode.commands.executeCommand('editor.action.webvieweditor.hideFind');
+          }
+        }
       }),
     );
 

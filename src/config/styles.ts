@@ -31,6 +31,8 @@ interface Palette {
   accent: string;
   border: string;
   codeBg: string;
+  /** Inline code text. Must be set explicitly: VS Code's webview CSS colors `code` from the VS Code theme. */
+  codeFg: string;
   link: string;
   navBg: string;
   search: string;
@@ -45,6 +47,7 @@ const PRESETS: Record<ThemePreset, Palette> = {
     accent: 'var(--vscode-textLink-foreground)',
     border: 'var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.35))',
     codeBg: 'var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.12))',
+    codeFg: 'var(--vscode-textPreformat-foreground, var(--rm-fg))',
     link: 'var(--vscode-textLink-foreground)',
     navBg: 'var(--vscode-sideBar-background, var(--vscode-editor-background))',
     search: 'var(--vscode-editor-findMatchHighlightBackground, rgba(234, 92, 0, 0.33))',
@@ -57,6 +60,7 @@ const PRESETS: Record<ThemePreset, Palette> = {
     accent: '#0969da',
     border: '#d1d9e0',
     codeBg: '#f6f8fa',
+    codeFg: 'var(--rm-fg)',
     link: '#0969da',
     navBg: '#f6f8fa',
     search: 'rgba(255, 212, 0, 0.45)',
@@ -69,6 +73,7 @@ const PRESETS: Record<ThemePreset, Palette> = {
     accent: '#4493f8',
     border: '#3d444d',
     codeBg: '#151b23',
+    codeFg: 'var(--rm-fg)',
     link: '#4493f8',
     navBg: '#010409',
     search: 'rgba(187, 128, 9, 0.4)',
@@ -81,6 +86,7 @@ const PRESETS: Record<ThemePreset, Palette> = {
     accent: '#a0522d',
     border: '#d8c9a7',
     codeBg: '#ebe0c6',
+    codeFg: 'var(--rm-fg)',
     link: '#8b4513',
     navBg: '#ede3cb',
     search: 'rgba(255, 200, 0, 0.45)',
@@ -93,6 +99,7 @@ const PRESETS: Record<ThemePreset, Palette> = {
     accent: '#ffd600',
     border: '#ffffff',
     codeBg: '#111111',
+    codeFg: 'var(--rm-fg)',
     link: '#6fc3ff',
     navBg: '#000000',
     search: 'rgba(255, 214, 0, 0.45)',
@@ -137,6 +144,7 @@ export function buildCssVariables(s: StyleSettings): string {
     '--rm-accent': p.accent,
     '--rm-border': p.border,
     '--rm-code-bg': p.codeBg,
+    '--rm-code-fg': p.codeFg,
     '--rm-link': p.link,
     '--rm-nav-bg': p.navBg,
     '--rm-font': cssValue(s.bodyFontFamily) || SYSTEM_FONT,

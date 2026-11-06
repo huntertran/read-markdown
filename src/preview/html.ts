@@ -50,6 +50,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri
       <ol id="rm-nav-list"></ol>
       <div id="rm-nav-empty" hidden>No headings</div>
     </nav>
+    <div id="rm-nav-resizer" role="separator" aria-orientation="vertical" aria-label="Resize quick navigation" aria-valuemin="120" aria-valuemax="600" tabindex="0" title="Drag to resize, double-click to reset"></div>
     <main id="rm-main">
       <article id="rm-content" class="rm-markdown"></article>
     </main>

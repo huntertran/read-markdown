@@ -5,7 +5,7 @@ A reading-focused Markdown preview for VS Code, built for the long documents AI 
 
 ## Features
 
-- **Quick navigation**: a sidebar outline of the document's headings. It has a filter box, highlights the section you are reading, and has buttons to collapse or expand everything.
+- **Quick navigation**: a sidebar outline of the document's headings. It has a filter box, highlights the section you are reading, and has buttons to collapse or expand everything. Drag its edge to resize it; the width is saved to `readMarkdown.nav.width` (double-click the edge to reset).
 - **Collapsible sections**: fold the content under any heading with the chevron next to it. Folded sections are remembered while you edit.
 - **Search highlight sync**: select text in the Markdown source, or step through matches with the Find widget (`Ctrl+F`, then `Enter`/`F3`). Every occurrence is highlighted in the preview, and it scrolls to the current match.
 - **Scroll sync** between the source and the preview, in both directions.

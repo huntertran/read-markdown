@@ -40,6 +40,7 @@ export const QUICK_SETTING_KEYS = [
   'nav.show',
   'nav.position',
   'nav.maxDepth',
+  'nav.width',
   'theme.preset',
   'body.fontSize',
   'body.lineHeight',

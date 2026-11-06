@@ -7,6 +7,7 @@ Initial release.
 ### Reading
 - Reading-focused Markdown preview that refreshes as you type and when the file changes on disk.
 - Quick navigation outline (left or right) with a heading filter and active-section tracking.
+  Drag its edge to resize it; the width is remembered.
 - Collapsible sections, with one button that collapses all sections or expands them again.
 - Code highlighting with a copy button, Mermaid diagrams, task lists, footnotes and front matter.
 - GitHub alerts (`NOTE`, `TIP`, `IMPORTANT`, `WARNING`, `CAUTION`), each with a faint type icon in the background.
