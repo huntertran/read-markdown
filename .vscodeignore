@@ -14,3 +14,5 @@ esbuild.mjs
 *.vsix
 .claude/**
 media/marketplace-icon.svg
+plan/**
+CLAUDE.md

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0
+
+- Edit in the preview (opt-in, `readMarkdown.edit.enabled`): click ✎ next to a block
+  to edit its Markdown source in place. `Ctrl+Enter` saves the block, `Esc` cancels. Task list checkboxes
+  can be clicked to check or uncheck items in the source directly. Edits are undoable
+  and are refused if the file changed in the meantime. Sub-options: `readMarkdown.edit.doubleClick`
+  opens a block by double-clicking it, `readMarkdown.edit.saveOnCommit` saves the file after each edit.
+
 ## 0.2.0
 
 - Resizable navigation outline: drag its edge to resize it; the width is remembered
