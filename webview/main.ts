@@ -1,6 +1,7 @@
 import type { ToWebview, UiConfig } from '../src/protocol';
 import { $, getState, patchState, post } from './api';
 import { decorateCodeBlocks, initCodeBlocks } from './codeblocks';
+import { deferRender, initBlockEdit, onBlockSource, onEditResult, onTaskResult, setEditable, syncTaskCheckboxes } from './editBlock';
 import { renderMermaid, rerenderMermaid } from './mermaid';
 import { initNav, setHeadings, updateActive } from './nav';
 import { initNavResize, syncNavWidth } from './navResize';
@@ -51,6 +52,7 @@ function applyConfig(msg: Extract<ToWebview, { type: 'config' }>): void {
   body.dataset.preset = ui.preset;
   updateScheme();
   updateSettingsPanel(ui);
+  setEditable(ui.editable, ui.editDoubleClick);
   syncNavWidth();
   invalidate();
 
@@ -64,6 +66,8 @@ function applyConfig(msg: Extract<ToWebview, { type: 'config' }>): void {
 
 function renderContent(msg: Extract<ToWebview, { type: 'render' }>): void {
   if (!ui) return;
+  // Held back while a block is being edited in place; applied when the editor closes.
+  if (deferRender(msg)) return;
   lastRender = msg;
   const scrollY = window.scrollY;
   const state = getState();
@@ -76,6 +80,7 @@ function renderContent(msg: Extract<ToWebview, { type: 'render' }>): void {
     collapsed: previous,
   });
   decorateCodeBlocks(content, ui.copyButton);
+  syncTaskCheckboxes();
   setHeadings(msg.headings, ui.navMaxDepth);
   invalidate();
 
@@ -126,6 +131,15 @@ window.addEventListener('message', (event: MessageEvent<ToWebview>) => {
       break;
     case 'revealHeading':
       revealHeading(msg.slug);
+      break;
+    case 'blockSource':
+      onBlockSource(msg);
+      break;
+    case 'editResult':
+      onEditResult(msg);
+      break;
+    case 'taskResult':
+      onTaskResult(msg);
       break;
   }
 });
@@ -223,6 +237,7 @@ $('rm-top').addEventListener('click', () => window.scrollTo({ top: 0, behavior: 
 initScrollMap(content);
 initSearch($('rm-search-badge'));
 initCodeBlocks(content);
+initBlockEdit({ content, docVersion: () => lastRender?.docVersion, render: renderContent });
 initSettingsPanel($('rm-settings'), $('rm-open-settings'));
 initNav({
   list: $('rm-nav-list') as HTMLOListElement,

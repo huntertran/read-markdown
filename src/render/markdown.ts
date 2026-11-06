@@ -48,7 +48,9 @@ export function createMarkdownRenderer(): (source: string, options: RenderOption
   md.use(footnote);
   md.use(taskLists, { enabled: false, label: true });
 
-  // Source map: annotate every opening block token with its starting source line.
+  // Source map: annotate every opening block token with its starting source line. Top-level
+  // blocks also get their end line (exclusive) so the preview can edit them as raw source; their
+  // ranges are disjoint, unlike nested blocks (list items, blockquote paragraphs).
   md.core.ruler.push('rm_source_map', (state) => {
     const env = getEnv(state.env);
     for (const token of state.tokens) {
@@ -56,6 +58,7 @@ export function createMarkdownRenderer(): (source: string, options: RenderOption
       if (token.nesting === 1 || BLOCK_LEAVES.has(token.type)) {
         const line = token.map[0];
         token.attrSet('data-line', String(line));
+        if (token.level === 0) token.attrSet('data-line-end', String(token.map[1]));
         env.blockLines?.add(line);
       }
     }
@@ -108,11 +111,11 @@ export function createMarkdownRenderer(): (source: string, options: RenderOption
     const token = tokens[idx];
     const info = token.info ? md.utils.unescapeAll(token.info).trim() : '';
     const lang = info.split(/\s+/)[0] ?? '';
-    const line = token.attrGet('data-line') ?? '';
+    const lines = lineAttrs(token);
 
     if (lang.toLowerCase() === 'mermaid' && env.options?.mermaid) {
       env.hasMermaid = true;
-      return `<div class="rm-mermaid" data-line="${line}"><pre class="mermaid">${escapeHtml(token.content)}</pre></div>\n`;
+      return `<div class="rm-mermaid"${lines}><pre class="mermaid">${escapeHtml(token.content)}</pre></div>\n`;
     }
 
     let body: string;
@@ -128,13 +131,12 @@ export function createMarkdownRenderer(): (source: string, options: RenderOption
     }
     const langAttr = lang ? ` data-lang="${escapeHtml(lang)}"` : '';
     const cls = language ? ` class="hljs language-${escapeHtml(language)}"` : ' class="hljs"';
-    return `<pre class="rm-code" data-line="${line}"${langAttr}><code${cls}>${body}</code></pre>\n`;
+    return `<pre class="rm-code"${lines}${langAttr}><code${cls}>${body}</code></pre>\n`;
   };
 
   md.renderer.rules.code_block = (tokens, idx) => {
     const token = tokens[idx];
-    const line = token.attrGet('data-line') ?? '';
-    return `<pre class="rm-code" data-line="${line}"><code class="hljs">${escapeHtml(token.content)}</code></pre>\n`;
+    return `<pre class="rm-code"${lineAttrs(token)}><code class="hljs">${escapeHtml(token.content)}</code></pre>\n`;
   };
 
   const defaultImage = md.renderer.rules.image!;
@@ -160,7 +162,9 @@ export function createMarkdownRenderer(): (source: string, options: RenderOption
       // Replace front matter with blank lines so source line numbers stay aligned.
       const lineCount = fm[0].split(/\r?\n/).length - 1;
       source = '\n'.repeat(lineCount) + source.slice(fm[0].length);
-      prefix = `<details class="rm-frontmatter" data-line="0"><summary>Front matter</summary><pre class="rm-code"><code class="hljs language-yaml">${safeHighlight(fm[1], 'yaml')}</code></pre></details>\n`;
+      // Without a trailing newline the closing `---` line is not counted by lineCount.
+      const end = /\n$/.test(fm[0]) ? lineCount : lineCount + 1;
+      prefix = `<details class="rm-frontmatter" data-line="0" data-line-end="${end}"><summary>Front matter</summary><pre class="rm-code"><code class="hljs language-yaml">${safeHighlight(fm[1], 'yaml')}</code></pre></details>\n`;
       env.blockLines.add(0);
     }
     const html = prefix + md.render(source, env as unknown as Record<string, unknown>);
@@ -171,6 +175,13 @@ export function createMarkdownRenderer(): (source: string, options: RenderOption
       blockLines: [...env.blockLines].sort((a, b) => a - b),
     };
   };
+}
+
+/** ` data-line="…"` (and ` data-line-end="…"` for top-level blocks) for manually rendered tokens. */
+function lineAttrs(token: Token): string {
+  const line = token.attrGet('data-line');
+  const end = token.attrGet('data-line-end');
+  return (line !== null ? ` data-line="${line}"` : '') + (end !== null ? ` data-line-end="${end}"` : '');
 }
 
 function safeHighlight(code: string, language: string): string {

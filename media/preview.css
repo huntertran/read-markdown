@@ -317,6 +317,14 @@ body.rm-nav-visible[data-nav-position='right'] #rm-settings {
   gap: 8px;
 }
 
+.rm-settings-sub {
+  padding-left: 22px;
+}
+
+.rm-settings-disabled {
+  opacity: 0.5;
+}
+
 .rm-settings-color {
   flex-direction: row;
   align-items: center;
@@ -469,6 +477,19 @@ body.rm-nav-visible[data-nav-position='right'] #rm-settings {
   border-color: var(--rm-accent);
   background-color: var(--rm-accent);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.5l3.2 3.2L13 5' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+/* Clickable while in-preview editing is enabled (readMarkdown.edit.enabled). */
+.rm-markdown .task-list-item input[type='checkbox']:enabled {
+  cursor: pointer;
+}
+
+.rm-markdown .task-list-item input[type='checkbox']:enabled:hover {
+  border-color: var(--rm-accent);
+}
+
+.rm-markdown .task-list-item input.rm-task-pending {
+  opacity: 0.5;
 }
 
 /* Done items recede so the open ones stand out. */
@@ -865,6 +886,119 @@ body[data-scheme='dark'] :is(.hljs-name, .hljs-tag, .hljs-selector-pseudo) { col
 body[data-scheme='dark'] .hljs-addition { color: #aff5b4; background: #033a16; }
 body[data-scheme='dark'] .hljs-deletion { color: #ffdcd7; background: #67060c; }
 
+/* ---- in-preview block editing --------------------------------------------------------- */
+
+.rm-edit-pencil {
+  position: absolute;
+  z-index: 5;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  font-family: var(--rm-ui-font);
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--rm-muted);
+  background: var(--rm-bg);
+  border: 1px solid var(--rm-border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.rm-edit-pencil:hover,
+.rm-edit-pencil:focus-visible {
+  color: var(--rm-fg);
+  background: var(--rm-hover-bg);
+}
+
+.rm-edit-pencil[hidden] {
+  display: none;
+}
+
+.rm-edit {
+  margin: 0 0 1em;
+  padding: 6px;
+  border: 1px solid var(--vscode-focusBorder, var(--rm-accent));
+  border-radius: 6px;
+  background: var(--rm-subtle-bg);
+}
+
+.rm-edit-input {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 4.5em;
+  padding: 8px 10px;
+  resize: vertical;
+  overflow: hidden;
+  font-family: var(--rm-mono);
+  font-size: 0.9em;
+  line-height: 1.5;
+  tab-size: 4;
+  color: var(--vscode-input-foreground, var(--rm-fg));
+  background: var(--vscode-input-background, var(--rm-bg));
+  border: 1px solid var(--vscode-input-border, var(--rm-border));
+  border-radius: 4px;
+  outline: none;
+}
+
+.rm-edit-input:focus {
+  border-color: var(--vscode-focusBorder, var(--rm-accent));
+}
+
+.rm-edit-saving .rm-edit-input {
+  opacity: 0.6;
+}
+
+.rm-edit-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-family: var(--rm-ui-font);
+  font-size: 12px;
+}
+
+.rm-edit-hint {
+  flex: 1;
+  color: var(--rm-muted);
+}
+
+.rm-edit-bar button {
+  padding: 3px 12px;
+  font: inherit;
+  color: var(--vscode-button-secondaryForeground, var(--rm-fg));
+  background: var(--vscode-button-secondaryBackground, var(--rm-subtle-bg));
+  border: 1px solid var(--rm-border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.rm-edit-bar .rm-edit-save {
+  color: var(--vscode-button-foreground, #fff);
+  background: var(--vscode-button-background, var(--rm-accent));
+  border-color: transparent;
+}
+
+.rm-edit-bar .rm-edit-save:hover {
+  background: var(--vscode-button-hoverBackground, var(--rm-accent));
+}
+
+.rm-edit-notice,
+.rm-edit-flash {
+  margin-top: 6px;
+  padding: 4px 8px;
+  font-family: var(--rm-ui-font);
+  font-size: 12px;
+  color: var(--vscode-inputValidation-warningForeground, var(--rm-fg));
+  background: var(--vscode-inputValidation-warningBackground, var(--rm-subtle-bg));
+  border: 1px solid var(--vscode-inputValidation-warningBorder, var(--rm-border));
+  border-radius: 4px;
+}
+
+.rm-edit-flash {
+  margin: -0.5em 0 1em;
+}
+
 /* ---- narrow viewports --------------------------------------------------------------- */
 
 @media (max-width: 640px) {
@@ -907,7 +1041,8 @@ body[data-scheme='dark'] .hljs-deletion { color: #ffdcd7; background: #67060c; }
   #rm-toolbar,
   #rm-settings,
   .rm-fold,
-  .rm-copy {
+  .rm-copy,
+  .rm-edit-pencil {
     display: none !important;
   }
 

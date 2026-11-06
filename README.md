@@ -14,6 +14,7 @@ A reading-focused Markdown preview for VS Code, built for the long documents AI 
 - **Quick settings panel** (⚙ in the preview) for the most common options. It writes your VS Code settings.
 - **Code highlighting** with a copy button, **Mermaid diagrams**, GitHub alerts (`> [!NOTE]`), task lists, footnotes, front matter.
 - **Live refresh**: the preview updates as you type, and also when the file changes on disk (e.g. an agent rewrites it).
+- **Edit in the preview** (opt-in, `readMarkdown.edit.enabled`): fix a paragraph, list, table, code block or front matter without leaving the preview. See [Editing in the preview](#editing-in-the-preview).
 
 ## Usage
 
@@ -23,6 +24,7 @@ A reading-focused Markdown preview for VS Code, built for the long documents AI 
 | Open to the side | `Read Markdown: Open Preview to the Side` |
 | Jump to source | Double-click a heading, or `Read Markdown: Show Source` |
 | Toggle outline | ☰ in the preview, or `Read Markdown: Toggle Quick Navigation` |
+| Edit a block | ✎ next to a block (needs `readMarkdown.edit.enabled`), or double-click it if `readMarkdown.edit.doubleClick` is on |
 
 ### Replacing the built-in preview
 
@@ -35,6 +37,19 @@ A reading-focused Markdown preview for VS Code, built for the long documents AI 
   ```
 
 VS Code does not let extensions hide the built-in preview button, so it stays in the editor title bar.
+
+### Editing in the preview
+
+Turn on `readMarkdown.edit.enabled` (or **Edit blocks in preview** in the ⚙ panel). Then hover a block and click ✎ to edit its Markdown source in place.
+
+To also open a block by double-clicking it, turn on `readMarkdown.edit.doubleClick` (**Double-click to edit** in the ⚙ panel). It is off by default because double-clicking normally selects a word. Double-clicking a heading still jumps to the source, so use ✎ for headings.
+
+- `Ctrl+Enter` (`Cmd+Enter` on macOS) or **Save** writes the block back to the document. `Esc` or **Cancel** discards your changes.
+- Task list checkboxes (`- [ ]`) become clickable: a click checks or unchecks the item in the source directly, without opening the block editor. Clicking the item text does not toggle it.
+- You edit the raw Markdown of one top-level block. A list, table or blockquote is edited as a whole, and so is the front matter.
+- The edit goes through VS Code's normal undo stack: `Ctrl+Z` in the source editor reverts it. The file is not saved unless `readMarkdown.edit.saveOnCommit` is on, or the file is not open in any editor (so an edit never sits in an unsaved buffer you cannot see).
+- If the file changes while a block is open (you type in the source editor, or an agent rewrites the file), saving is refused. Copy your text, then cancel to reload the block.
+- Read-only documents (e.g. Git history) cannot be edited.
 
 ### About search sync
 
@@ -58,6 +73,7 @@ All settings live under `readMarkdown.*`. Search "Read Markdown" in the Settings
 | `table.headerBackgroundColor`, `table.headerTextColor` | accent tint, body text | Table header colors |
 | `sections.collapsible`, `sections.startCollapsedBelowLevel` | `true`, `0` | Folding |
 | `code.copyButton`, `mermaid.enabled`, `preview.scrollSync` | `true` | Extras |
+| `edit.enabled`, `edit.doubleClick`, `edit.saveOnCommit` | `false`, `false`, `false` | [Editing in the preview](#editing-in-the-preview) |
 
 Example:
 
@@ -68,7 +84,7 @@ Example:
 "readMarkdown.customCss.inline": ".rm-markdown p { text-align: justify; }"
 ```
 
-Custom CSS can target `.rm-markdown` (content), `#rm-nav` (outline), `.rm-section`, `.rm-heading`, `pre.rm-code` and the `--rm-*` CSS variables.
+Custom CSS can target `.rm-markdown` (content), `#rm-nav` (outline), `.rm-section`, `.rm-heading`, `pre.rm-code`, `.rm-edit` (the in-place block editor) and the `--rm-*` CSS variables.
 
 ## Development
 

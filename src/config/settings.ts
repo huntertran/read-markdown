@@ -23,6 +23,9 @@ export interface Settings extends StyleSettings {
   mermaid: boolean;
   collapsible: boolean;
   startCollapsedBelowLevel: number;
+  editEnabled: boolean;
+  editDoubleClick: boolean;
+  editSaveOnCommit: boolean;
 }
 
 export function getSettings(scope?: vscode.ConfigurationScope): Settings {
@@ -61,6 +64,9 @@ export function getSettings(scope?: vscode.ConfigurationScope): Settings {
     mermaid: c.get<boolean>('mermaid.enabled', true),
     collapsible: c.get<boolean>('sections.collapsible', true),
     startCollapsedBelowLevel: c.get<number>('sections.startCollapsedBelowLevel', 0),
+    editEnabled: c.get<boolean>('edit.enabled', false),
+    editDoubleClick: c.get<boolean>('edit.doubleClick', false),
+    editSaveOnCommit: c.get<boolean>('edit.saveOnCommit', false),
   };
 }
 
@@ -83,6 +89,8 @@ export function toUiConfig(s: Settings): UiConfig {
     headingScale: s.headingScale,
     tableHeaderBackgroundColor: s.tableHeaderBackgroundColor,
     tableHeaderTextColor: s.tableHeaderTextColor,
+    editable: s.editEnabled,
+    editDoubleClick: s.editDoubleClick,
   };
 }
 
@@ -97,6 +105,8 @@ export function validateQuickSetting(key: string, value: unknown): unknown {
     typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max ? value : undefined;
   switch (k) {
     case 'nav.show':
+    case 'edit.enabled':
+    case 'edit.doubleClick':
       return typeof value === 'boolean' ? value : undefined;
     case 'nav.position':
       return value === 'left' || value === 'right' ? value : undefined;

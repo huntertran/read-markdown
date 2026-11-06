@@ -412,6 +412,24 @@
           "default": 0,
           "description": "Start with sections at this heading level and deeper collapsed (e.g. 3 collapses H3-H6). 0 disables.",
           "order": 71
+        },
+        "readMarkdown.edit.enabled": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Edit the Markdown source of a block (paragraph, heading, list, table, code block, front matter) directly in the preview: hover a block and click ✎. Task list checkboxes become clickable and toggle `[ ]` / `[x]` in the source directly. `Ctrl+Enter` / `Cmd+Enter` saves the block, `Escape` cancels. Edits go through the normal undo stack.",
+          "order": 80
+        },
+        "readMarkdown.edit.doubleClick": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Also open a block for editing by double-clicking it. Double-clicking a heading still jumps to the source. Only applies when `#readMarkdown.edit.enabled#` is on.",
+          "order": 81
+        },
+        "readMarkdown.edit.saveOnCommit": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Save the file after each block edit made in the preview. Files not open in any text editor are always saved, so edits are never left in an invisible unsaved buffer. Only applies when `#readMarkdown.edit.enabled#` is on.",
+          "order": 82
         }
       }
     }

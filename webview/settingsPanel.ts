@@ -6,7 +6,8 @@ import { post } from './api';
 type Control =
   | { kind: 'select'; key: QuickSettingKey; label: string; options: [string, string][]; get: (c: UiConfig) => string; parse?: (v: string) => unknown }
   | { kind: 'range'; key: QuickSettingKey; label: string; min: number; max: number; step: number; get: (c: UiConfig) => number; format: (v: number) => string }
-  | { kind: 'checkbox'; key: QuickSettingKey; label: string; get: (c: UiConfig) => boolean }
+  /** `parent`: sub-option, indented and disabled while the parent checkbox is off. */
+  | { kind: 'checkbox'; key: QuickSettingKey; label: string; get: (c: UiConfig) => boolean; parent?: (c: UiConfig) => boolean }
   /** `cssVar` is previewed live while picking; `probe` is the CSS property read from a sample cell for the default. */
   | { kind: 'color'; key: QuickSettingKey; label: string; cssVar: string; probe: 'backgroundColor' | 'color'; get: (c: UiConfig) => string };
 
@@ -84,6 +85,8 @@ const CONTROLS: Control[] = [
     get: (c) => String(c.navMaxDepth),
     parse: Number,
   },
+  { kind: 'checkbox', key: 'edit.enabled', label: 'Edit blocks in preview (✎)', get: (c) => c.editable },
+  { kind: 'checkbox', key: 'edit.doubleClick', label: 'Double-click to edit', get: (c) => c.editDoubleClick, parent: (c) => c.editable },
 ];
 
 let panel: HTMLElement;
@@ -186,7 +189,15 @@ export function initSettingsPanel(container: HTMLElement, toggle: HTMLElement): 
       const input = document.createElement('input');
       input.type = 'checkbox';
       input.addEventListener('change', () => post({ type: 'updateSetting', key: control.key, value: input.checked }));
-      updaters.push((c) => (input.checked = control.get(c)));
+      const parent = control.parent;
+      if (parent) row.classList.add('rm-settings-sub');
+      updaters.push((c) => {
+        input.checked = control.get(c);
+        if (parent) {
+          input.disabled = !parent(c);
+          row.classList.toggle('rm-settings-disabled', input.disabled);
+        }
+      });
       row.append(input, name);
     }
     panel.append(row);

@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import * as vscode from 'vscode';
+import { applyBlockEdit, readBlock, toggleTask } from '../edit/blockEdit';
 import type { FromWebview, ToWebview } from '../protocol';
 import type { RenderResult } from '../render/markdown';
 import { blockStartFor, countOccurrences, searchTermFromSelection } from '../sync/selection';
@@ -110,16 +111,26 @@ export class PreviewPanel implements vscode.Disposable {
     }, RENDER_DEBOUNCE_MS);
   }
 
-  async render(): Promise<void> {
-    if (!this.ready || this.disposed) return;
+  /** The bound document, reopened if VS Code closed it (e.g. no editor shows it any more). */
+  private async liveDocument(): Promise<vscode.TextDocument | undefined> {
     if (this.document.isClosed) {
       try {
         this.document = await vscode.workspace.openTextDocument(this.document.uri);
       } catch {
-        return;
+        return undefined;
       }
     }
-    const doc = this.document;
+    return this.document;
+  }
+
+  async render(): Promise<void> {
+    if (!this.ready || this.disposed) return;
+    if (this.renderTimer) {
+      clearTimeout(this.renderTimer);
+      this.renderTimer = undefined;
+    }
+    const doc = await this.liveDocument();
+    if (!doc) return;
     const result = this.manager.render(doc.getText(), {
       mermaid: this.manager.settings.mermaid,
       resolveResource: (p) => this.resolveResource(p),
@@ -239,7 +250,61 @@ export class PreviewPanel implements vscode.Disposable {
       case 'showSource':
         await this.manager.showSource(this, m.line);
         break;
+      case 'requestBlockSource':
+        await this.sendBlockSource(m.start, m.end, m.docVersion);
+        break;
+      case 'editBlock':
+        await this.editBlock(m.start, m.end, m.docVersion, m.text);
+        break;
+      case 'toggleTask':
+        await this.setTaskChecked(m.line, m.checked, m.docVersion);
+        break;
     }
+  }
+
+  // ---- in-preview editing ----------------------------------------------------------------
+
+  private async sendBlockSource(start: number, end: number, docVersion: number): Promise<void> {
+    if (!this.manager.settings.editEnabled) return;
+    const doc = await this.liveDocument();
+    const result = doc ? readBlock(doc, start, end, docVersion) : ({ error: 'failed' } as const);
+    this.post({ type: 'blockSource', start, end, docVersion, ...result });
+  }
+
+  private async editBlock(start: number, end: number, docVersion: number, text: string): Promise<void> {
+    if (!this.manager.settings.editEnabled) return;
+    const doc = await this.liveDocument();
+    const result = doc ? await applyBlockEdit(doc, start, end, docVersion, text) : ({ ok: false, error: 'failed' } as const);
+    if (result.ok && doc) await this.afterEdit(doc);
+    this.post({ type: 'editResult', start, end, ok: result.ok, error: result.ok ? undefined : result.error });
+  }
+
+  private async setTaskChecked(line: number, checked: boolean, docVersion: number): Promise<void> {
+    // Always reply: the webview locks its checkboxes until it hears back.
+    const doc = this.manager.settings.editEnabled ? await this.liveDocument() : undefined;
+    const result = doc ? await toggleTask(doc, line, checked, docVersion) : ({ ok: false, error: 'failed' } as const);
+    if (result.ok && doc) await this.afterEdit(doc);
+    this.post({ type: 'taskResult', line, ok: result.ok, error: result.ok ? undefined : result.error });
+  }
+
+  private async afterEdit(doc: vscode.TextDocument): Promise<void> {
+    // Render right away instead of waiting for the change listener's debounce.
+    await this.render();
+    if (doc.isDirty && !doc.isUntitled && (this.manager.settings.editSaveOnCommit || !this.isOpenInTextEditor())) {
+      // A document not shown in any text editor would otherwise hold an unsaved edit nobody sees.
+      await doc.save();
+    }
+  }
+
+  /** True if a tab shows this document and so displays its unsaved state. */
+  private isOpenInTextEditor(): boolean {
+    const uri = this.document.uri.toString();
+    // The custom editor (`readMarkdown.editor`) shows the dirty state itself, like a text editor.
+    return vscode.window.tabGroups.all.some((g) =>
+      g.tabs.some(
+        (t) => (t.input instanceof vscode.TabInputText || t.input instanceof vscode.TabInputCustom) && t.input.uri.toString() === uri,
+      ),
+    );
   }
 
   dispose(): void {

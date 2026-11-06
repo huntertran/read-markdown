@@ -33,6 +33,10 @@ export interface UiConfig {
   /** Empty string = theme default. */
   tableHeaderBackgroundColor: string;
   tableHeaderTextColor: string;
+  /** In-preview block editing (`readMarkdown.edit.enabled`). */
+  editable: boolean;
+  /** Double-click opens a block for editing (`readMarkdown.edit.doubleClick`); only acts when `editable`. */
+  editDoubleClick: boolean;
 }
 
 /** Keys the webview quick panel may change (relative to `readMarkdown.`). */
@@ -49,6 +53,8 @@ export const QUICK_SETTING_KEYS = [
   'headings.highlight',
   'table.headerBackgroundColor',
   'table.headerTextColor',
+  'edit.enabled',
+  'edit.doubleClick',
 ] as const;
 export type QuickSettingKey = (typeof QUICK_SETTING_KEYS)[number];
 
@@ -57,7 +63,20 @@ export type ToWebview =
   | { type: 'config'; css: string; customCss: string; ui: UiConfig }
   | { type: 'highlight'; term: string; caseSensitive: boolean; blockLine: number; occurrence: number }
   | { type: 'scrollToLine'; line: number }
-  | { type: 'revealHeading'; slug: string };
+  | { type: 'revealHeading'; slug: string }
+  /** Reply to `requestBlockSource`: source of lines [start, end) with LF line endings, no trailing line breaks. */
+  | { type: 'blockSource'; start: number; end: number; docVersion: number; text?: string; error?: EditError }
+  /** Reply to `editBlock`. */
+  | { type: 'editResult'; start: number; end: number; ok: boolean; error?: EditError }
+  /** Reply to `toggleTask`. */
+  | { type: 'taskResult'; line: number; ok: boolean; error?: EditError };
+
+/**
+ * Why a block edit was refused: `stale` = the document changed since the preview was rendered,
+ * `readonly` = the document's file system is not writable, `invalid` = bad line range,
+ * `failed` = VS Code rejected the edit.
+ */
+export type EditError = 'stale' | 'readonly' | 'invalid' | 'failed';
 
 export type FromWebview =
   | { type: 'ready' }
@@ -66,7 +85,13 @@ export type FromWebview =
   | { type: 'updateSetting'; key: QuickSettingKey; value: unknown }
   | { type: 'openSettings' }
   | { type: 'copy'; text: string }
-  | { type: 'showSource'; line?: number };
+  | { type: 'showSource'; line?: number }
+  /** Ask for the source of top-level block lines [start, end) as rendered at `docVersion`. */
+  | { type: 'requestBlockSource'; start: number; end: number; docVersion: number }
+  /** Replace source lines [start, end) with `text`, if the document is still at `docVersion`. */
+  | { type: 'editBlock'; start: number; end: number; docVersion: number; text: string }
+  /** Check or uncheck the task list item on source `line`, if the document is still at `docVersion`. */
+  | { type: 'toggleTask'; line: number; checked: boolean; docVersion: number };
 
 export interface WebviewState {
   uri: string;
