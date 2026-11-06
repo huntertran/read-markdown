@@ -2,7 +2,7 @@
   "name": "read-markdown",
   "displayName": "Read Markdown",
   "description": "A reading-focused Markdown preview for long documents: heading navigation, collapsible sections, typography customization, search highlight sync, Mermaid and code highlighting.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "huntertran",
   "license": "GPL-3.0-only",
   "icon": "media/icon.png",

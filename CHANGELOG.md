@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0
+
+- Resizable navigation outline: drag its edge to resize it; the width is remembered
+  (`readMarkdown.nav.width`). Double-click the edge to reset it.
+- Fix: a closed find widget no longer reappears when you switch back to the preview.
+
 ## 0.1.0
 
 Initial release.
@@ -7,7 +13,6 @@ Initial release.
 ### Reading
 - Reading-focused Markdown preview that refreshes as you type and when the file changes on disk.
 - Quick navigation outline (left or right) with a heading filter and active-section tracking.
-  Drag its edge to resize it; the width is remembered.
 - Collapsible sections, with one button that collapses all sections or expands them again.
 - Code highlighting with a copy button, Mermaid diagrams, task lists, footnotes and front matter.
 - GitHub alerts (`NOTE`, `TIP`, `IMPORTANT`, `WARNING`, `CAUTION`), each with a faint type icon in the background.
