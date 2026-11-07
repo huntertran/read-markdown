@@ -22,9 +22,10 @@ A reading-focused Markdown preview for VS Code, built for the long documents AI 
 | --- | --- |
 | Open preview | `Read Markdown: Open Preview` / book icon in the editor title |
 | Open to the side | `Read Markdown: Open Preview to the Side` |
-| Jump to source | Double-click a heading, or `Read Markdown: Show Source` |
+| Jump to source | Right-click a block → **Show Source**, ⠿ → **Show source** next to a block (edit mode), or `Read Markdown: Show Source` |
 | Toggle outline | ☰ in the preview, or `Read Markdown: Toggle Quick Navigation` |
-| Edit a block | ✎ next to a block (needs `readMarkdown.edit.enabled`), or double-click it if `readMarkdown.edit.doubleClick` is on |
+| Edit a block | ✎ next to a block or right-click → **Edit Block** (needs `readMarkdown.edit.enabled`), or double-click it if `readMarkdown.edit.doubleClick` is on |
+| Reorder list items | Drag the ⠿ grip left of a bullet or checkbox, or focus it and press `Alt+↑` / `Alt+↓` (needs `readMarkdown.edit.enabled`) |
 
 ### Replacing the built-in preview
 
@@ -40,11 +41,12 @@ VS Code does not let extensions hide the built-in preview button, so it stays in
 
 ### Editing in the preview
 
-Turn on `readMarkdown.edit.enabled` (or **Edit blocks in preview** in the ⚙ panel). Then hover a block and click ✎ to edit its Markdown source in place.
+Turn on `readMarkdown.edit.enabled` (or **Edit blocks in preview** in the ⚙ panel). Then right-click a block and choose **Edit Block**, or hover it: a small toolbar appears in the left margin, with ✎ to edit the block's Markdown source in place and ⠿ for more block actions (such as **Show source**). On headings it sits to the left of the collapse arrow. The toolbar only appears in edit mode, so reading stays uncluttered.
 
-To also open a block by double-clicking it, turn on `readMarkdown.edit.doubleClick` (**Double-click to edit** in the ⚙ panel). It is off by default because double-clicking normally selects a word. Double-clicking a heading still jumps to the source, so use ✎ for headings.
+To also open a block by double-clicking it, turn on `readMarkdown.edit.doubleClick` (**Double-click to edit** in the ⚙ panel). It is off by default because double-clicking normally selects a word.
 
 - `Ctrl+Enter` (`Cmd+Enter` on macOS) or **Save** writes the block back to the document. `Esc` or **Cancel** discards your changes.
+- List items can be reordered: hover an item and drag the ⠿ grip that appears left of its bullet or checkbox. The other items slide aside to show where it will land; `Esc` cancels. With the grip focused, `Alt+↑` / `Alt+↓` moves the item by one. Nested items and continuation lines move with their item, numbered lists keep their numbering, and one `Ctrl+Z` undoes the move. Items move within their own list only, and lists inside blockquotes cannot be reordered. If your system asks for reduced motion, a line marks the drop point instead of the animation.
 - Task list checkboxes (`- [ ]`) become clickable: a click checks or unchecks the item in the source directly, without opening the block editor. Clicking the item text does not toggle it.
 - You edit the raw Markdown of one top-level block. A list, table or blockquote is edited as a whole, and so is the front matter.
 - The edit goes through VS Code's normal undo stack: `Ctrl+Z` in the source editor reverts it. The file is not saved unless `readMarkdown.edit.saveOnCommit` is on, or the file is not open in any editor (so an edit never sits in an unsaved buffer you cannot see).

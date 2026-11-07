@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import * as vscode from 'vscode';
-import { applyBlockEdit, readBlock, toggleTask } from '../edit/blockEdit';
+import { applyBlockEdit, moveListItemEdit, readBlock, toggleTask } from '../edit/blockEdit';
 import type { FromWebview, ToWebview } from '../protocol';
 import type { RenderResult } from '../render/markdown';
 import { blockStartFor, countOccurrences, searchTermFromSelection } from '../sync/selection';
@@ -212,6 +212,11 @@ export class PreviewPanel implements vscode.Disposable {
     this.post({ type: 'revealHeading', slug });
   }
 
+  /** Opens the block starting at source `line` in the in-preview editor. */
+  startEdit(line: number): void {
+    this.post({ type: 'startEdit', line });
+  }
+
   // ---- messages --------------------------------------------------------------------------
 
   private async onMessage(m: FromWebview): Promise<void> {
@@ -259,6 +264,9 @@ export class PreviewPanel implements vscode.Disposable {
       case 'toggleTask':
         await this.setTaskChecked(m.line, m.checked, m.docVersion);
         break;
+      case 'moveListItem':
+        await this.moveListItem(m.starts, m.end, m.from, m.to, m.docVersion);
+        break;
     }
   }
 
@@ -285,6 +293,14 @@ export class PreviewPanel implements vscode.Disposable {
     const result = doc ? await toggleTask(doc, line, checked, docVersion) : ({ ok: false, error: 'failed' } as const);
     if (result.ok && doc) await this.afterEdit(doc);
     this.post({ type: 'taskResult', line, ok: result.ok, error: result.ok ? undefined : result.error });
+  }
+
+  private async moveListItem(starts: number[], end: number, from: number, to: number, docVersion: number): Promise<void> {
+    // Always reply: the webview has already reordered the list and puts it back on failure.
+    const doc = this.manager.settings.editEnabled ? await this.liveDocument() : undefined;
+    const result = doc ? await moveListItemEdit(doc, starts, end, from, to, docVersion) : ({ ok: false, error: 'failed' } as const);
+    if (result.ok && doc) await this.afterEdit(doc);
+    this.post(result.ok ? { type: 'moveResult', ok: true, line: result.line } : { type: 'moveResult', ok: false, error: result.error });
   }
 
   private async afterEdit(doc: vscode.TextDocument): Promise<void> {

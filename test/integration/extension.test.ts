@@ -1,7 +1,7 @@
 import * as assert from 'node:assert/strict';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
-import { applyBlockEdit, readBlock, toggleTask } from '../../src/edit/blockEdit';
+import { applyBlockEdit, moveListItemEdit, readBlock, toggleTask } from '../../src/edit/blockEdit';
 
 const EXTENSION_ID = 'huntertran.read-markdown';
 
@@ -38,9 +38,20 @@ describe('Read Markdown extension', () => {
 
   it('registers its commands', async () => {
     const commands = await vscode.commands.getCommands(true);
-    for (const c of ['readMarkdown.openPreview', 'readMarkdown.openPreviewToSide', 'readMarkdown.toggleNav', 'readMarkdown.showSource']) {
+    for (const c of ['readMarkdown.openPreview', 'readMarkdown.openPreviewToSide', 'readMarkdown.toggleNav', 'readMarkdown.showSource', 'readMarkdown.editBlock']) {
       assert.ok(commands.includes(c), `missing command ${c}`);
     }
+  });
+
+  it('shows the source at the line of a block right-clicked in the preview', async () => {
+    const uri = fixture('long-ai-doc.md');
+    await vscode.commands.executeCommand('readMarkdown.openPreview', uri);
+    await waitFor(() => previewTabs().length === 1);
+    // What VS Code passes from the webview/context menu (data-vscode-context merged up to <body>).
+    await vscode.commands.executeCommand('readMarkdown.showSource', { webviewSection: 'rm-block', rmLine: 5, rmEditable: false });
+    await waitFor(() => vscode.window.activeTextEditor?.document.uri.toString() === uri.toString());
+    assert.equal(vscode.window.activeTextEditor?.selection.active.line, 5);
+    await vscode.commands.executeCommand('workbench.action.closeAllEditors');
   });
 
   it('opens a preview to the side for the active markdown file', async () => {
@@ -84,6 +95,21 @@ describe('Read Markdown extension', () => {
       assert.equal(doc.eol, vscode.EndOfLine.CRLF);
       assert.deepEqual(await applyBlockEdit(doc, 2, 3, doc.version, 'two\nthree'), { ok: true });
       assert.equal(doc.getText(), 'one\r\n\r\ntwo\r\nthree\r\n');
+    });
+
+    it('moves a list item as one undoable edit', async () => {
+      const original = '# Tasks\r\n\r\n1. [ ] one\r\n2. [x] two\r\n   more\r\n3. [ ] three\r\n\r\nafter\r\n';
+      const doc = await untitled(original);
+      await vscode.window.showTextDocument(doc);
+      // Items start at lines 2, 3 and 5; the list ends at line 7 (after its trailing blank line).
+      assert.deepEqual(await moveListItemEdit(doc, [2, 3, 5], 7, 2, 0, doc.version), { ok: true, line: 2 });
+      assert.equal(doc.getText(), '# Tasks\r\n\r\n1. [ ] three\r\n2. [ ] one\r\n3. [x] two\r\n   more\r\n\r\nafter\r\n');
+
+      await vscode.commands.executeCommand('undo');
+      await waitFor(() => doc.getText() === original);
+      assert.deepEqual(await moveListItemEdit(doc, [2, 3, 5], 7, 0, 1, doc.version - 1), { ok: false, error: 'stale' });
+      assert.deepEqual(await moveListItemEdit(doc, [2, 4, 5], 7, 0, 1, doc.version), { ok: false, error: 'invalid' });
+      await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
     });
 
     it('toggles a task checkbox by rewriting only its state character', async () => {

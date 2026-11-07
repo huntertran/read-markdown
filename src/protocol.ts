@@ -69,7 +69,11 @@ export type ToWebview =
   /** Reply to `editBlock`. */
   | { type: 'editResult'; start: number; end: number; ok: boolean; error?: EditError }
   /** Reply to `toggleTask`. */
-  | { type: 'taskResult'; line: number; ok: boolean; error?: EditError };
+  | { type: 'taskResult'; line: number; ok: boolean; error?: EditError }
+  /** Open the top-level block starting at source `line` for editing (preview context menu). */
+  | { type: 'startEdit'; line: number }
+  /** Reply to `moveListItem`; `line` is the moved item's new start line. */
+  | { type: 'moveResult'; ok: boolean; line?: number; error?: EditError };
 
 /**
  * Why a block edit was refused: `stale` = the document changed since the preview was rendered,
@@ -91,7 +95,24 @@ export type FromWebview =
   /** Replace source lines [start, end) with `text`, if the document is still at `docVersion`. */
   | { type: 'editBlock'; start: number; end: number; docVersion: number; text: string }
   /** Check or uncheck the task list item on source `line`, if the document is still at `docVersion`. */
-  | { type: 'toggleTask'; line: number; checked: boolean; docVersion: number };
+  | { type: 'toggleTask'; line: number; checked: boolean; docVersion: number }
+  /**
+   * Move list item `from` to position `to` among sibling items starting at source lines `starts`
+   * (the last ending at `end`, exclusive), if the document is still at `docVersion`.
+   */
+  | { type: 'moveListItem'; starts: number[]; end: number; from: number; to: number; docVersion: number };
+
+/**
+ * `data-vscode-context` the webview sets, merged by VS Code from the right-clicked element up to
+ * `<body>` and passed to `webview/context` menu commands: `rmEditable` on the body, the rest on
+ * each top-level block.
+ */
+export interface BlockMenuContext {
+  webviewSection?: 'rm-block';
+  /** 0-based source line where the block starts. */
+  rmLine?: number;
+  rmEditable?: boolean;
+}
 
 export interface WebviewState {
   uri: string;

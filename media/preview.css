@@ -888,15 +888,37 @@ body[data-scheme='dark'] .hljs-deletion { color: #ffdcd7; background: #67060c; }
 
 /* ---- in-preview block editing --------------------------------------------------------- */
 
-.rm-edit-pencil {
+/* Block action rail (webview/blockActions.ts): [⋮⋮ handle] [actions…] left of the hovered block,
+   and left of a heading's fold button. Edit mode widens the gutter so the rail and fold both fit. */
+body.rm-block-tools #rm-main {
+  padding-left: 72px;
+}
+
+.rm-block-rail {
   position: absolute;
   z-index: 5;
-  width: 22px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-family: var(--rm-ui-font);
+}
+
+.rm-block-rail-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.rm-block-rail button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 22px;
   height: 22px;
   padding: 0;
-  font-family: var(--rm-ui-font);
+  font-family: inherit;
   font-size: 13px;
-  line-height: 20px;
+  line-height: 1;
   color: var(--rm-muted);
   background: var(--rm-bg);
   border: 1px solid var(--rm-border);
@@ -904,14 +926,147 @@ body[data-scheme='dark'] .hljs-deletion { color: #ffdcd7; background: #67060c; }
   cursor: pointer;
 }
 
-.rm-edit-pencil:hover,
-.rm-edit-pencil:focus-visible {
+.rm-block-rail .rm-block-handle {
+  min-width: 14px;
+  width: 14px;
+  background: transparent;
+  border-color: transparent;
+}
+
+.rm-block-rail button:hover,
+.rm-block-rail button:focus-visible,
+.rm-block-handle[aria-expanded='true'] {
   color: var(--rm-fg);
   background: var(--rm-hover-bg);
 }
 
-.rm-edit-pencil[hidden] {
+.rm-block-rail[hidden],
+.rm-block-rail button[hidden],
+.rm-block-menu[hidden] {
   display: none;
+}
+
+.rm-block-menu {
+  position: absolute;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 150px;
+  padding: 4px;
+  font-family: var(--rm-ui-font);
+  font-size: 13px;
+  color: var(--vscode-menu-foreground, var(--rm-fg));
+  background: var(--vscode-menu-background, var(--rm-bg));
+  border: 1px solid var(--vscode-menu-border, var(--rm-border));
+  border-radius: 6px;
+  box-shadow: 0 4px 16px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.3));
+}
+
+.rm-block-menu button {
+  padding: 4px 10px;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.rm-block-menu button:hover,
+.rm-block-menu button:focus-visible {
+  color: var(--vscode-menu-selectionForeground, inherit);
+  background: var(--vscode-menu-selectionBackground, var(--rm-hover-bg));
+  outline: none;
+}
+
+/* List item drag (webview/listDrag.ts): grip in the list's left padding, left of the bullet. */
+.rm-item-grip {
+  position: absolute;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 20px;
+  padding: 0;
+  color: var(--rm-muted);
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  cursor: grab;
+  touch-action: none;
+}
+
+.rm-item-grip:hover,
+.rm-item-grip:focus-visible {
+  color: var(--rm-fg);
+  background: var(--rm-hover-bg);
+}
+
+.rm-item-grip[hidden] {
+  display: none;
+}
+
+.rm-item-grip.rm-item-grip-dragging,
+body.rm-list-dragging .rm-block-rail {
+  visibility: hidden;
+}
+
+body.rm-list-dragging,
+body.rm-list-dragging * {
+  cursor: grabbing !important;
+  user-select: none;
+}
+
+/* Siblings slide out of the way while an item is dragged over them. */
+.rm-markdown .rm-list-reordering > li:not(.rm-li-lifted) {
+  transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.rm-markdown li.rm-li-lifted {
+  position: relative;
+  z-index: 4;
+}
+
+/* Card behind the lifted item, reaching left over its bullet or checkbox. */
+.rm-markdown li.rm-li-lifted::before {
+  content: '';
+  position: absolute;
+  inset: -3px -8px -3px -1.9em;
+  z-index: -1;
+  background: var(--rm-bg);
+  border-radius: 5px;
+  box-shadow: 0 6px 18px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.28));
+  transition: box-shadow 200ms;
+}
+
+.rm-markdown li.rm-li-settling::before {
+  box-shadow: none;
+}
+
+/* Reduced motion: the item stays put, dimmed, and a line marks the drop point. */
+.rm-markdown li.rm-li-drag-source {
+  opacity: 0.45;
+}
+
+.rm-drop-line {
+  position: absolute;
+  z-index: 6;
+  height: 2px;
+  background: var(--rm-accent);
+  border-radius: 1px;
+  pointer-events: none;
+}
+
+.rm-drop-line[hidden] {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rm-markdown .rm-list-reordering > li:not(.rm-li-lifted) {
+    transition: none;
+  }
 }
 
 .rm-edit {
@@ -1042,7 +1197,10 @@ body[data-scheme='dark'] .hljs-deletion { color: #ffdcd7; background: #67060c; }
   #rm-settings,
   .rm-fold,
   .rm-copy,
-  .rm-edit-pencil {
+  .rm-block-rail,
+  .rm-block-menu,
+  .rm-item-grip,
+  .rm-drop-line {
     display: none !important;
   }
 

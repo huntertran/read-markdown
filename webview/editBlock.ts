@@ -5,6 +5,7 @@
 // so they do not wipe the textarea, then applied when it closes.
 import type { EditError, ToWebview } from '../src/protocol';
 import { post } from './api';
+import { hideBlockActions, registerBlockAction } from './blockActions';
 import { invalidate, scrollProgrammatically } from './scroll';
 
 type RenderMessage = Extract<ToWebview, { type: 'render' }>;
@@ -50,36 +51,17 @@ let request: { block: HTMLElement; start: number; end: number } | undefined;
 let pendingRender: RenderMessage | undefined;
 /** Task checkbox whose toggle is waiting for the extension's `taskResult`. */
 let pendingTask: { line: number; input: HTMLInputElement } | undefined;
-let pencil: HTMLButtonElement;
-let pencilTarget: HTMLElement | undefined;
-let hideTimer: ReturnType<typeof setTimeout> | undefined;
 
 export function initBlockEdit(options: Options): void {
   opts = options;
-  pencil = document.createElement('button');
-  pencil.type = 'button';
-  pencil.className = 'rm-edit-pencil';
-  pencil.textContent = '✎';
-  pencil.title = 'Edit this block';
-  pencil.setAttribute('aria-label', 'Edit this block');
-  pencil.hidden = true;
-  pencil.addEventListener('click', (e) => {
-    e.preventDefault();
-    if (pencilTarget) startEdit(pencilTarget);
-  });
-  document.body.append(pencil);
-
-  document.addEventListener('mouseover', (e) => {
-    if (!enabled || session) return;
-    const target = e.target as Element;
-    if (pencil.contains(target)) {
-      clearTimeout(hideTimer);
-      return;
-    }
-    const block = findBlock(target);
-    if (block) showPencil(block);
-    // Delay hiding so the pointer can travel from the block across the margin to the pencil.
-    else scheduleHidePencil();
+  // Primary action, so it gets a rail button rather than a menu item.
+  registerBlockAction({
+    id: 'edit',
+    label: 'Edit this block',
+    icon: '✎',
+    placement: 'rail',
+    when: () => enabled && !session,
+    run: startEdit,
   });
 
   // Task list checkboxes toggle in place instead of opening the block editor.
@@ -105,8 +87,8 @@ export function initBlockEdit(options: Options): void {
   opts.content.addEventListener('dblclick', (e) => {
     if (!enabled || !doubleClick) return;
     const target = e.target as Element;
-    // Headings keep their double-click action (jump to source); links and controls keep theirs.
-    if (target.closest('h1, h2, h3, h4, h5, h6, a, button, input, summary, .rm-edit')) return;
+    // Links and controls keep their own double-click behaviour.
+    if (target.closest('a, button, input, summary, .rm-edit')) return;
     const block = findBlock(target);
     if (!block) return;
     window.getSelection()?.removeAllRanges();
@@ -114,12 +96,23 @@ export function initBlockEdit(options: Options): void {
   });
 }
 
+/** True while a block is open in the editor. */
+export function isEditing(): boolean {
+  return session !== undefined;
+}
+
+/** Opens the top-level block starting at source `line` (context menu → Edit Block). */
+export function editBlockAtLine(line: number): void {
+  if (!enabled) return;
+  const block = opts.content.querySelector<HTMLElement>(`[data-line-end][data-line="${line}"]`);
+  if (block) startEdit(block);
+}
+
 export function setEditable(value: boolean, editOnDoubleClick: boolean): void {
   enabled = value;
   doubleClick = value && editOnDoubleClick;
   syncTaskCheckboxes();
   if (!enabled) {
-    hidePencil();
     if (session && !session.saving) close();
   }
 }
@@ -150,35 +143,11 @@ function findBlock(target: Element): HTMLElement | undefined {
   return block;
 }
 
-// ---- pencil button -------------------------------------------------------------------------
-
-function showPencil(block: HTMLElement): void {
-  clearTimeout(hideTimer);
-  pencilTarget = block;
-  const rect = block.getBoundingClientRect();
-  pencil.hidden = false;
-  pencil.style.top = `${rect.top + window.scrollY}px`;
-  pencil.style.left = `${Math.max(2, rect.left + window.scrollX - pencil.offsetWidth - 6)}px`;
-}
-
-function scheduleHidePencil(): void {
-  if (pencil.hidden) return;
-  clearTimeout(hideTimer);
-  hideTimer = setTimeout(hidePencil, 400);
-}
-
-function hidePencil(): void {
-  clearTimeout(hideTimer);
-  pencil.hidden = true;
-  pencilTarget = undefined;
-}
-
 // ---- render deferral -----------------------------------------------------------------------
 
 /** Call before applying a render. Returns true if the render was held back for an open editor. */
 export function deferRender(msg: RenderMessage): boolean {
   if (!session) {
-    hidePencil();
     pendingRender = undefined;
     return false;
   }
@@ -190,7 +159,7 @@ export function deferRender(msg: RenderMessage): boolean {
 // ---- edit session --------------------------------------------------------------------------
 
 function startEdit(block: HTMLElement): void {
-  hidePencil();
+  hideBlockActions();
   if (session) {
     session.textarea.focus();
     return;

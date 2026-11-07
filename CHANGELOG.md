@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+- Reorder list items in the preview (edit mode): drag the ⠿ grip left of a bullet or checkbox, or press
+  `Alt+↑`/`Alt+↓` on it. Siblings slide aside while you drag (a drop line instead when reduced motion is on).
+  Nested items move along, numbered lists keep their numbers, and the move is a single undo step.
+- Block actions now share one toolbar in the left margin (⠿ menu, then ✎), so the edit button no longer
+  covers a heading's collapse arrow. The ⠿ menu adds **Show source** for any block. Edit mode reserves a
+  slightly wider left margin to fit it.
+- Double-clicking a heading no longer jumps to the source; it selects text like anywhere else (or opens the
+  heading for editing when `readMarkdown.edit.doubleClick` is on). Use right-click → **Show Source**,
+  ⠿ → **Show source** or `Read Markdown: Show Source` instead.
+- The preview's right-click menu has **Edit Block** (edit mode) and **Show Source** for the block under the
+  pointer, next to Cut/Copy/Paste.
+
 ## 0.3.0
 
 - Edit in the preview (opt-in, `readMarkdown.edit.enabled`): click ✎ next to a block

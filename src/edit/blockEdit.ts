@@ -1,9 +1,11 @@
 import * as vscode from 'vscode';
 import type { EditError } from '../protocol';
 import { isValidBlockRange, taskMarkerColumn, toEditText, toReplacement } from './blockText';
+import { moveListItem } from './listMove';
 
 export type BlockSourceResult = { text: string } | { error: EditError };
 export type BlockEditResult = { ok: true } | { ok: false; error: EditError };
+export type ListMoveEditResult = { ok: true; line: number } | { ok: false; error: EditError };
 
 function blockRange(document: vscode.TextDocument, start: number, end: number): vscode.Range {
   // `end` may equal lineCount (block on the last line without trailing newline); validateRange
@@ -70,6 +72,34 @@ export async function toggleTask(
   const current = document.getText(range) !== ' ';
   if (current === checked) return { ok: true };
   return replace(document, range, checked ? 'x' : ' ');
+}
+
+/**
+ * Moves list item `from` to position `to` among the sibling items starting at source lines
+ * `starts` (the last one ending at `end`), if the document is still at `docVersion`. Returns the
+ * moved item's new start line.
+ */
+export async function moveListItemEdit(
+  document: vscode.TextDocument,
+  starts: number[],
+  end: number,
+  from: number,
+  to: number,
+  docVersion: number,
+): Promise<ListMoveEditResult> {
+  if (!Array.isArray(starts) || starts.length < 2) return { ok: false, error: 'invalid' };
+  const first = starts[0];
+  const error = check(document, first, end, docVersion);
+  if (error) return { ok: false, error };
+  const lines: string[] = [];
+  for (let i = first; i < end; i++) lines.push(document.lineAt(i).text);
+  const moved = moveListItem(lines, starts.map((s) => (typeof s === 'number' ? s - first : NaN)), from, to);
+  if (!moved) return { ok: false, error: 'invalid' };
+  const last = first + moved.count - 1;
+  const range = new vscode.Range(first, 0, last, document.lineAt(last).text.length);
+  const eol = document.eol === vscode.EndOfLine.CRLF ? '\r\n' : '\n';
+  const result = await replace(document, range, moved.lines.join(eol));
+  return result.ok ? { ok: true, line: first + moved.movedOffset } : result;
 }
 
 async function replace(document: vscode.TextDocument, range: vscode.Range, text: string): Promise<BlockEditResult> {

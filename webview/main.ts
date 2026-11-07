@@ -1,8 +1,10 @@
 import type { ToWebview, UiConfig } from '../src/protocol';
 import { $, getState, patchState, post } from './api';
+import { hideBlockActions, initBlockActions, registerBlockAction, setBlockActionsEnabled } from './blockActions';
 import { decorateCodeBlocks, initCodeBlocks } from './codeblocks';
-import { deferRender, initBlockEdit, onBlockSource, onEditResult, onTaskResult, setEditable, syncTaskCheckboxes } from './editBlock';
+import { deferRender, editBlockAtLine, initBlockEdit, isEditing, onBlockSource, onEditResult, onTaskResult, setEditable, syncTaskCheckboxes } from './editBlock';
 import { renderMermaid, rerenderMermaid } from './mermaid';
+import { cancelListDrag, initListDrag, onMoveResult, setListDragEnabled } from './listDrag';
 import { initNav, setHeadings, updateActive } from './nav';
 import { initNavResize, syncNavWidth } from './navResize';
 import { sanitize } from './sanitize';
@@ -53,6 +55,10 @@ function applyConfig(msg: Extract<ToWebview, { type: 'config' }>): void {
   updateScheme();
   updateSettingsPanel(ui);
   setEditable(ui.editable, ui.editDoubleClick);
+  setBlockActionsEnabled(ui.editable);
+  setListDragEnabled(ui.editable);
+  // Context keys for the `webview/context` menu (merged with the block's own, see stampMenuContext).
+  body.dataset.vscodeContext = JSON.stringify({ rmEditable: ui.editable });
   syncNavWidth();
   invalidate();
 
@@ -68,6 +74,8 @@ function renderContent(msg: Extract<ToWebview, { type: 'render' }>): void {
   if (!ui) return;
   // Held back while a block is being edited in place; applied when the editor closes.
   if (deferRender(msg)) return;
+  hideBlockActions();
+  cancelListDrag();
   lastRender = msg;
   const scrollY = window.scrollY;
   const state = getState();
@@ -80,6 +88,7 @@ function renderContent(msg: Extract<ToWebview, { type: 'render' }>): void {
     collapsed: previous,
   });
   decorateCodeBlocks(content, ui.copyButton);
+  stampMenuContext();
   syncTaskCheckboxes();
   setHeadings(msg.headings, ui.navMaxDepth);
   invalidate();
@@ -93,6 +102,13 @@ function renderContent(msg: Extract<ToWebview, { type: 'render' }>): void {
   saveCollapsed();
   reapplySearch(content);
   if (msg.hasMermaid && ui.mermaid) void renderMermaid(content, scheme).then(invalidate);
+}
+
+/** Tags each top-level block so the preview's context menu (Edit Block, Show Source) knows its line. */
+function stampMenuContext(): void {
+  for (const block of content.querySelectorAll<HTMLElement>('[data-line-end]')) {
+    block.dataset.vscodeContext = JSON.stringify({ webviewSection: 'rm-block', rmLine: Number(block.dataset.line) });
+  }
 }
 
 function saveCollapsed(): void {
@@ -140,6 +156,12 @@ window.addEventListener('message', (event: MessageEvent<ToWebview>) => {
       break;
     case 'taskResult':
       onTaskResult(msg);
+      break;
+    case 'startEdit':
+      editBlockAtLine(msg.line);
+      break;
+    case 'moveResult':
+      onMoveResult(msg);
       break;
   }
 });
@@ -197,15 +219,6 @@ content.addEventListener('click', (e) => {
   }
 });
 
-// Double-click a heading (outside text selection) to jump to it in the source.
-content.addEventListener('dblclick', (e) => {
-  const heading = (e.target as Element).closest<HTMLElement>('.rm-heading, h1, h2, h3, h4, h5, h6');
-  if (heading?.dataset.line) {
-    window.getSelection()?.removeAllRanges();
-    post({ type: 'showSource', line: Number(heading.dataset.line) });
-  }
-});
-
 // One button: "Collapse all" while any section is expanded, "Expand all" once every section is collapsed.
 const foldAll = $('rm-fold-all');
 
@@ -237,7 +250,15 @@ $('rm-top').addEventListener('click', () => window.scrollTo({ top: 0, behavior: 
 initScrollMap(content);
 initSearch($('rm-search-badge'));
 initCodeBlocks(content);
+initBlockActions(content);
+registerBlockAction({
+  id: 'source',
+  label: 'Show source',
+  placement: 'menu',
+  run: (block) => post({ type: 'showSource', line: Number(block.dataset.line) }),
+});
 initBlockEdit({ content, docVersion: () => lastRender?.docVersion, render: renderContent });
+initListDrag({ content, docVersion: () => lastRender?.docVersion, isBusy: isEditing });
 initSettingsPanel($('rm-settings'), $('rm-open-settings'));
 initNav({
   list: $('rm-nav-list') as HTMLOListElement,

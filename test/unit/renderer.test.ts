@@ -22,7 +22,7 @@ describe('markdown renderer', () => {
     const r = render('para one\n\n- a\n- b\n\n```js\nconst x = 1;\n```\n', opts);
     assert.match(r.html, /<p data-line="0" data-line-end="1">/);
     assert.match(r.html, /<ul data-line="2" data-line-end="5">/);
-    assert.match(r.html, /<li data-line="3">/);
+    assert.match(r.html, /<li data-line="3" data-item-end="5">/);
     assert.match(r.html, /<pre class="rm-code" data-line="5" data-line-end="8" data-lang="js">/);
     assert.deepEqual(r.blockLines, [0, 2, 3, 5]);
   });
@@ -38,6 +38,15 @@ describe('markdown renderer', () => {
     assert.match(r.html, /<div class="rm-mermaid" data-line="13" data-line-end="16">/);
     // Nested blocks have no end line: their ranges overlap the parent's.
     assert.equal(r.html.match(/data-line-end=/g)?.length, 6);
+  });
+
+  it('marks list items with their end line for reordering', () => {
+    const r = render('- a\n- b\n  - b1\n- c\n\npara\n', opts);
+    assert.match(r.html, /<li data-line="0" data-item-end="1">/);
+    assert.match(r.html, /<li data-line="1" data-item-end="3">/);
+    assert.match(r.html, /<li data-line="2" data-item-end="3">/);
+    assert.match(r.html, /<li data-line="3" data-item-end="5">/);
+    assert.match(r.html, /<ul data-line="0" data-line-end="5">/);
   });
 
   it('gives front matter an editable line range', () => {

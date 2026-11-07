@@ -53,6 +53,11 @@
         "title": "Show Source",
         "category": "Read Markdown",
         "icon": "$(go-to-file)"
+      },
+      {
+        "command": "readMarkdown.editBlock",
+        "title": "Edit Block",
+        "category": "Read Markdown"
       }
     ],
     "customEditors": [
@@ -85,6 +90,18 @@
       }
     ],
     "menus": {
+      "webview/context": [
+        {
+          "command": "readMarkdown.editBlock",
+          "when": "webviewSection == 'rm-block' && rmEditable",
+          "group": "1_readMarkdown@1"
+        },
+        {
+          "command": "readMarkdown.showSource",
+          "when": "webviewSection == 'rm-block'",
+          "group": "1_readMarkdown@2"
+        }
+      ],
       "editor/title": [
         {
           "command": "readMarkdown.openPreviewToSide",
@@ -112,6 +129,10 @@
         }
       ],
       "commandPalette": [
+        {
+          "command": "readMarkdown.editBlock",
+          "when": "false"
+        },
         {
           "command": "readMarkdown.showSource",
           "when": "activeWebviewPanelId == 'readMarkdown.preview' || activeCustomEditorId == 'readMarkdown.editor'"
@@ -422,7 +443,7 @@
         "readMarkdown.edit.doubleClick": {
           "type": "boolean",
           "default": false,
-          "markdownDescription": "Also open a block for editing by double-clicking it. Double-clicking a heading still jumps to the source. Only applies when `#readMarkdown.edit.enabled#` is on.",
+          "markdownDescription": "Also open a block for editing by double-clicking it. Only applies when `#readMarkdown.edit.enabled#` is on.",
           "order": 81
         },
         "readMarkdown.edit.saveOnCommit": {

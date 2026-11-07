@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import type { WebviewState } from './protocol';
+import type { BlockMenuContext, WebviewState } from './protocol';
 import { PreviewManager } from './preview/previewManager';
 import { PREVIEW_VIEW_TYPE } from './preview/previewPanel';
 
@@ -12,6 +12,11 @@ function resolveTarget(uri?: vscode.Uri): vscode.Uri | undefined {
   const editor = vscode.window.activeTextEditor;
   if (editor && editor.document.languageId === 'markdown') return editor.document.uri;
   return manager?.lastActivePanel?.uri;
+}
+
+function blockLine(ctx: unknown): number | undefined {
+  const line = (ctx as BlockMenuContext | undefined)?.rmLine;
+  return typeof line === 'number' && Number.isInteger(line) && line >= 0 ? line : undefined;
 }
 
 export function activate(context: vscode.ExtensionContext): { manager: PreviewManager } {
@@ -31,9 +36,16 @@ export function activate(context: vscode.ExtensionContext): { manager: PreviewMa
       await m.open(target, vscode.ViewColumn.Beside, true);
     }),
     vscode.commands.registerCommand('readMarkdown.toggleNav', () => m.toggleNav()),
-    vscode.commands.registerCommand('readMarkdown.showSource', async () => {
+    // From the preview's context menu, `ctx` holds the right-clicked block's line; from the
+    // title bar or palette it is absent (or a URI), and the source opens at its current position.
+    vscode.commands.registerCommand('readMarkdown.showSource', async (ctx?: BlockMenuContext) => {
       const panel = m.activePanel ?? m.lastActivePanel;
-      if (panel) await m.showSource(panel);
+      if (panel) await m.showSource(panel, blockLine(ctx));
+    }),
+    vscode.commands.registerCommand('readMarkdown.editBlock', (ctx?: BlockMenuContext) => {
+      const panel = m.activePanel ?? m.lastActivePanel;
+      const line = blockLine(ctx);
+      if (panel && line !== undefined) panel.startEdit(line);
     }),
 
     vscode.window.registerWebviewPanelSerializer(PREVIEW_VIEW_TYPE, {

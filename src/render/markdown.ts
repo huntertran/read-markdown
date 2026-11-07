@@ -59,6 +59,9 @@ export function createMarkdownRenderer(): (source: string, options: RenderOption
         const line = token.map[0];
         token.attrSet('data-line', String(line));
         if (token.level === 0) token.attrSet('data-line-end', String(token.map[1]));
+        // List items get their own end line (not `data-line-end`, which marks editable top-level
+        // blocks) so the preview can reorder them; it includes nested lists and trailing blanks.
+        else if (token.type === 'list_item_open') token.attrSet('data-item-end', String(token.map[1]));
         env.blockLines?.add(line);
       }
     }

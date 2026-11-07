@@ -10,7 +10,8 @@ export function sanitize(html: string): DocumentFragment {
   root.querySelectorAll('*').forEach((el) => {
     for (const attr of [...el.attributes]) {
       const name = attr.name.toLowerCase();
-      if (name.startsWith('on')) el.removeAttribute(attr.name);
+      // `data-vscode-context` drives the preview's context menu; only the preview itself sets it.
+      if (name.startsWith('on') || name === 'data-vscode-context') el.removeAttribute(attr.name);
       else if (URL_ATTRS.includes(name) && /^\s*(javascript|vbscript|data:text\/html)/i.test(attr.value)) el.removeAttribute(attr.name);
     }
   });
