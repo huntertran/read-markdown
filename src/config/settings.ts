@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import type { HeadingHighlight, QuickSettingKey, ThemePreset, UiConfig } from '../protocol';
+import type { ChangesMode, HeadingHighlight, QuickSettingKey, ThemePreset, UiConfig } from '../protocol';
 import { QUICK_SETTING_KEYS } from '../protocol';
 import { type HeadingMap, type StyleSettings, schemeForPreset } from './styles';
 
@@ -26,6 +26,7 @@ export interface Settings extends StyleSettings {
   editEnabled: boolean;
   editDoubleClick: boolean;
   editSaveOnCommit: boolean;
+  changesMode: ChangesMode;
 }
 
 export function getSettings(scope?: vscode.ConfigurationScope): Settings {
@@ -67,6 +68,7 @@ export function getSettings(scope?: vscode.ConfigurationScope): Settings {
     editEnabled: c.get<boolean>('edit.enabled', false),
     editDoubleClick: c.get<boolean>('edit.doubleClick', false),
     editSaveOnCommit: c.get<boolean>('edit.saveOnCommit', false),
+    changesMode: c.get<ChangesMode>('changes.mode', 'inline'),
   };
 }
 
@@ -91,11 +93,13 @@ export function toUiConfig(s: Settings): UiConfig {
     tableHeaderTextColor: s.tableHeaderTextColor,
     editable: s.editEnabled,
     editDoubleClick: s.editDoubleClick,
+    changesMode: s.changesMode,
   };
 }
 
 const PRESETS: readonly string[] = ['vscode', 'light', 'dark', 'sepia', 'high-contrast'];
 const HIGHLIGHTS: readonly string[] = ['none', 'underline', 'background', 'leftBorder'];
+const CHANGES_MODES: readonly string[] = ['inline', 'gutter', 'off'];
 
 /** Validates a value coming from the webview quick panel. Returns undefined if invalid. */
 export function validateQuickSetting(key: string, value: unknown): unknown {
@@ -127,6 +131,8 @@ export function validateQuickSetting(key: string, value: unknown): unknown {
       return inRange(0.5, 3);
     case 'headings.highlight':
       return typeof value === 'string' && HIGHLIGHTS.includes(value) ? value : undefined;
+    case 'changes.mode':
+      return typeof value === 'string' && CHANGES_MODES.includes(value) ? value : undefined;
     case 'table.headerBackgroundColor':
     case 'table.headerTextColor':
       // '' resets to the theme default; the color picker only produces #rrggbb.

@@ -36,6 +36,7 @@ export function activate(context: vscode.ExtensionContext): { manager: PreviewMa
       await m.open(target, vscode.ViewColumn.Beside, true);
     }),
     vscode.commands.registerCommand('readMarkdown.toggleNav', () => m.toggleNav()),
+    vscode.commands.registerCommand('readMarkdown.toggleChanges', () => m.toggleChanges()),
     // From the preview's context menu, `ctx` holds the right-clicked block's line; from the
     // title bar or palette it is absent (or a URI), and the source opens at its current position.
     vscode.commands.registerCommand('readMarkdown.showSource', async (ctx?: BlockMenuContext) => {

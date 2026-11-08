@@ -6,6 +6,7 @@
 import type { EditError, ToWebview } from '../src/protocol';
 import { post } from './api';
 import { hideBlockActions, registerBlockAction } from './blockActions';
+import { REMOVED_SELECTOR } from './changes';
 import { invalidate, scrollProgrammatically } from './scroll';
 
 type RenderMessage = Extract<ToWebview, { type: 'render' }>;
@@ -121,6 +122,11 @@ export function setEditable(value: boolean, editOnDoubleClick: boolean): void {
 export function syncTaskCheckboxes(): void {
   pendingTask = undefined;
   for (const input of opts.content.querySelectorAll<HTMLInputElement>(`input.${TASK_CLASS}`)) {
+    // Removed items (track changes) are only shown for reference.
+    if (input.closest(REMOVED_SELECTOR)) {
+      input.disabled = true;
+      continue;
+    }
     input.disabled = !enabled;
     input.title = enabled ? (input.checked ? 'Mark as not done' : 'Mark as done') : '';
   }

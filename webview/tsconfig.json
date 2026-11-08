@@ -11,5 +11,5 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["./**/*.ts", "../src/protocol.ts"]
+  "include": ["./**/*.ts", "../src/protocol.ts", "../src/diff/*.ts"]
 }

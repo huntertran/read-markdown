@@ -1,5 +1,6 @@
 // Wraps each top-level heading and the content after it (until the next heading of the same or
 // higher level) into a collapsible <section>.
+import { REMOVED_SELECTOR } from './changes';
 
 const HEADING = /^H([1-6])$/;
 
@@ -16,7 +17,8 @@ export function buildSections(root: HTMLElement, opts: SectionOptions): void {
   const stack: { level: number; body: HTMLElement }[] = [];
 
   for (const child of [...root.children] as HTMLElement[]) {
-    const m = HEADING.exec(child.tagName);
+    // Removed headings (track changes) are shown in place but no longer start a section.
+    const m = child.matches(REMOVED_SELECTOR) ? null : HEADING.exec(child.tagName);
     if (!m) {
       (stack.at(-1)?.body ?? frag).append(child);
       continue;

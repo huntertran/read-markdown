@@ -2,6 +2,7 @@ import * as assert from 'node:assert/strict';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { applyBlockEdit, moveListItemEdit, readBlock, toggleTask } from '../../src/edit/blockEdit';
+import { GitBaseline } from '../../src/scm/gitBaseline';
 
 const EXTENSION_ID = 'huntertran.read-markdown';
 
@@ -38,7 +39,7 @@ describe('Read Markdown extension', () => {
 
   it('registers its commands', async () => {
     const commands = await vscode.commands.getCommands(true);
-    for (const c of ['readMarkdown.openPreview', 'readMarkdown.openPreviewToSide', 'readMarkdown.toggleNav', 'readMarkdown.showSource', 'readMarkdown.editBlock']) {
+    for (const c of ['readMarkdown.openPreview', 'readMarkdown.openPreviewToSide', 'readMarkdown.toggleNav', 'readMarkdown.toggleChanges', 'readMarkdown.showSource', 'readMarkdown.editBlock']) {
       assert.ok(commands.includes(c), `missing command ${c}`);
     }
   });
@@ -139,6 +140,18 @@ describe('Read Markdown extension', () => {
       assert.deepEqual(await applyBlockEdit(doc, 0, 9, doc.version, 'new'), { ok: false, error: 'invalid' });
       assert.equal(doc.getText(), 'xpara\n');
     });
+  });
+
+  it('has no git baseline for documents that are not files', async () => {
+    const baseline = new GitBaseline();
+    try {
+      const doc = await vscode.workspace.openTextDocument({ language: 'markdown', content: '# x\n' });
+      assert.equal(await baseline.getOriginal(doc.uri), undefined);
+      // Toggling with no preview open is a no-op, not an error.
+      await vscode.commands.executeCommand('readMarkdown.toggleChanges');
+    } finally {
+      baseline.dispose();
+    }
   });
 
   it('auto-opens a preview when enabled', async () => {

@@ -1,5 +1,7 @@
 import type { ToWebview, UiConfig } from '../src/protocol';
 import { $, getState, patchState, post } from './api';
+import { initChangeGutter, scheduleChangeGutter } from './changeGutter';
+import { applyChanges } from './changes';
 import { hideBlockActions, initBlockActions, registerBlockAction, setBlockActionsEnabled } from './blockActions';
 import { decorateCodeBlocks, initCodeBlocks } from './codeblocks';
 import { deferRender, editBlockAtLine, initBlockEdit, isEditing, onBlockSource, onEditResult, onTaskResult, setEditable, syncTaskCheckboxes } from './editBlock';
@@ -61,6 +63,8 @@ function applyConfig(msg: Extract<ToWebview, { type: 'config' }>): void {
   body.dataset.vscodeContext = JSON.stringify({ rmEditable: ui.editable });
   syncNavWidth();
   invalidate();
+  // A new setting value wins over this preview's toolbar toggle (the extension re-renders).
+  if (prev && prev.changesMode !== ui.changesMode) patchState({ changesMode: undefined });
 
   const needsRerender =
     prev &&
@@ -82,6 +86,11 @@ function renderContent(msg: Extract<ToWebview, { type: 'render' }>): void {
   const previous = rendered ? new Set(collapsedSlugs(content)) : state.collapsed ? new Set(state.collapsed) : undefined;
 
   content.replaceChildren(sanitize(msg.html));
+  const mode = changesMode();
+  const shown = msg.changes && mode !== 'off' ? mode : undefined;
+  if (msg.changes && shown) applyChanges(content, msg.changes, shown);
+  body.dataset.changes = shown ?? '';
+  updateChangesButton(shown);
   buildSections(content, {
     collapsible: ui.collapsible,
     startCollapsedBelowLevel: ui.startCollapsedBelowLevel,
@@ -101,7 +110,34 @@ function renderContent(msg: Extract<ToWebview, { type: 'render' }>): void {
   rendered = true;
   saveCollapsed();
   reapplySearch(content);
-  if (msg.hasMermaid && ui.mermaid) void renderMermaid(content, scheme).then(invalidate);
+  scheduleChangeGutter();
+  // Removed blocks may bring diagrams the current version no longer has.
+  if (ui.mermaid && (msg.hasMermaid || content.querySelector('.rm-mermaid'))) void renderMermaid(content, scheme).then(invalidate);
+}
+
+// ---- changes vs git index ----------------------------------------------------------------
+
+/** The setting, unless this preview's toolbar toggle overrides it. */
+function changesMode(): 'inline' | 'gutter' | 'off' {
+  if (!ui || ui.changesMode === 'off') return 'off';
+  return getState().changesMode ?? ui.changesMode;
+}
+
+const changesButton = $('rm-toggle-changes');
+
+function updateChangesButton(mode: 'inline' | 'gutter' | undefined): void {
+  changesButton.hidden = !mode;
+  const label = mode === 'inline' ? 'Show changes as bars only' : 'Show changes inline';
+  changesButton.title = label;
+  changesButton.setAttribute('aria-label', label);
+  changesButton.setAttribute('aria-pressed', String(mode === 'inline'));
+}
+
+function toggleChanges(): void {
+  const mode = changesMode();
+  if (mode === 'off') return;
+  patchState({ changesMode: mode === 'inline' ? 'gutter' : 'inline' });
+  if (lastRender) renderContent(lastRender);
 }
 
 /** Tags each top-level block so the preview's context menu (Edit Block, Show Source) knows its line. */
@@ -162,6 +198,9 @@ window.addEventListener('message', (event: MessageEvent<ToWebview>) => {
       break;
     case 'moveResult':
       onMoveResult(msg);
+      break;
+    case 'toggleChanges':
+      toggleChanges();
       break;
   }
 });
@@ -246,8 +285,10 @@ $('rm-toggle-nav').addEventListener('click', () => {
   else post({ type: 'updateSetting', key: 'nav.show', value: !ui?.navShow });
 });
 $('rm-top').addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'instant' }));
+changesButton.addEventListener('click', toggleChanges);
 
 initScrollMap(content);
+initChangeGutter(content, $('rm-main'));
 initSearch($('rm-search-badge'));
 initCodeBlocks(content);
 initBlockActions(content);

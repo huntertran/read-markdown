@@ -1,5 +1,6 @@
 // Highlights occurrences of the text selected in the source editor using the CSS Custom Highlight API
 // (no DOM mutation, so it is cheap and does not disturb scroll sync or selection).
+import { REMOVED_SELECTOR } from './changes';
 import { expandTo } from './sections';
 import { invalidate, scrollProgrammatically } from './scroll';
 
@@ -11,7 +12,8 @@ export interface SearchRequest {
 }
 
 const MAX_MATCHES = 5000;
-const SKIP = '.rm-mermaid, .rm-fold, .rm-copy, button, style, script, svg';
+// Removed text (track changes) is not in the source, so it must not shift occurrence counts.
+const SKIP = `.rm-mermaid, .rm-fold, .rm-copy, button, style, script, svg, del.rm-del, ${REMOVED_SELECTOR}`;
 const BLOCK = 'p, li, h1, h2, h3, h4, h5, h6, td, th, pre, blockquote, dt, dd, summary, figcaption, div, section, table';
 
 let current: SearchRequest | undefined;

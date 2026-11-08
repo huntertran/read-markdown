@@ -1,14 +1,19 @@
 import * as path from 'node:path';
 import * as vscode from 'vscode';
+import { diffDocument } from '../diff/blockDiff';
 import { applyBlockEdit, moveListItemEdit, readBlock, toggleTask } from '../edit/blockEdit';
-import type { FromWebview, ToWebview } from '../protocol';
-import type { RenderResult } from '../render/markdown';
+import type { DocChanges, FromWebview, ToWebview } from '../protocol';
+import type { RenderOptions, RenderResult } from '../render/markdown';
 import { blockStartFor, countOccurrences, searchTermFromSelection } from '../sync/selection';
 import { getWebviewHtml } from './html';
 import type { PreviewManager } from './previewManager';
 
 export const PREVIEW_VIEW_TYPE = 'readMarkdown.preview';
 const RENDER_DEBOUNCE_MS = 250;
+
+function eolNormalized(text: string): string {
+  return text.replace(/\r\n/g, '\n');
+}
 
 /** One preview webview bound to one Markdown document. */
 export class PreviewPanel implements vscode.Disposable {
@@ -17,6 +22,10 @@ export class PreviewPanel implements vscode.Disposable {
   private disposed = false;
   private renderTimer: ReturnType<typeof setTimeout> | undefined;
   private lastRender: RenderResult | undefined;
+  /** The git index version last rendered for change display, keyed by its source text. */
+  private originalRender: { source: string; result: RenderResult } | undefined;
+  /** Bumped per render so a slower, older render never overwrites a newer one. */
+  private renderSeq = 0;
   private lastHighlightKey = '';
   private pendingLine: number | undefined;
   /** Set while hidden; VS Code may wrongly re-show a closed find widget when the panel returns. */
@@ -129,14 +138,43 @@ export class PreviewPanel implements vscode.Disposable {
       clearTimeout(this.renderTimer);
       this.renderTimer = undefined;
     }
+    const seq = ++this.renderSeq;
     const doc = await this.liveDocument();
     if (!doc) return;
-    const result = this.manager.render(doc.getText(), {
+    const source = doc.getText();
+    const options: RenderOptions = {
       mermaid: this.manager.settings.mermaid,
       resolveResource: (p) => this.resolveResource(p),
-    });
+    };
+    const result = this.manager.render(source, options);
+    const changes = await this.changesFor(source, result, options);
+    if (seq !== this.renderSeq || this.disposed) return;
     this.lastRender = result;
-    this.post({ type: 'render', html: result.html, headings: result.headings, hasMermaid: result.hasMermaid, docVersion: doc.version });
+    this.post({
+      type: 'render',
+      html: result.html,
+      headings: result.headings,
+      hasMermaid: result.hasMermaid,
+      docVersion: doc.version,
+      changes,
+    });
+  }
+
+  /** Changes of `source` against the file's git index version, if any and if they are shown. */
+  private async changesFor(source: string, current: RenderResult, options: RenderOptions): Promise<DocChanges | undefined> {
+    if (this.manager.settings.changesMode === 'off') return undefined;
+    const original = await this.manager.baseline.getOriginal(this.document.uri);
+    if (original === undefined || eolNormalized(original) === eolNormalized(source)) return undefined;
+    if (this.originalRender?.source !== original) {
+      this.originalRender = { source: original, result: this.manager.render(original, options) };
+    }
+    const ops = diffDocument(this.originalRender.result.topBlocks, current.topBlocks);
+    return ops?.length ? { originalHtml: this.originalRender.result.html, ops } : undefined;
+  }
+
+  /** Asks the webview to switch between inline changes and gutter bars. */
+  toggleChanges(): void {
+    this.post({ type: 'toggleChanges' });
   }
 
   private resolveResource(p: string): string | undefined {

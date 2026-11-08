@@ -49,6 +49,11 @@
         "category": "Read Markdown"
       },
       {
+        "command": "readMarkdown.toggleChanges",
+        "title": "Toggle Inline Changes",
+        "category": "Read Markdown"
+      },
+      {
         "command": "readMarkdown.showSource",
         "title": "Show Source",
         "category": "Read Markdown",
@@ -135,6 +140,10 @@
         },
         {
           "command": "readMarkdown.showSource",
+          "when": "activeWebviewPanelId == 'readMarkdown.preview' || activeCustomEditorId == 'readMarkdown.editor'"
+        },
+        {
+          "command": "readMarkdown.toggleChanges",
           "when": "activeWebviewPanelId == 'readMarkdown.preview' || activeCustomEditorId == 'readMarkdown.editor'"
         }
       ]
@@ -451,6 +460,22 @@
           "default": false,
           "markdownDescription": "Save the file after each block edit made in the preview. Files not open in any text editor are always saved, so edits are never left in an invisible unsaved buffer. Only applies when `#readMarkdown.edit.enabled#` is on.",
           "order": 82
+        },
+        "readMarkdown.changes.mode": {
+          "type": "string",
+          "enum": [
+            "inline",
+            "gutter",
+            "off"
+          ],
+          "enumDescriptions": [
+            "Track changes in the text: removed text struck through in red, added text in green, moved blocks double-struck in red where they were and double-underlined in green where they are now (joined by a yellow arrow), plus change bars beside the text.",
+            "Only change bars beside the text (green added, blue modified, red removed, green moved).",
+            "Do not show changes."
+          ],
+          "default": "inline",
+          "markdownDescription": "Show how a git-tracked file differs from its staged (git index) version, like the change bars in the editor gutter. Clicking a file in the Source Control view still opens VS Code's text diff. The preview's ± toolbar button switches between `inline` and `gutter` for that preview.",
+          "order": 90
         }
       }
     }

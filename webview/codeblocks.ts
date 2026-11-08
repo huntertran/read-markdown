@@ -1,8 +1,10 @@
 import { post } from './api';
+import { REMOVED_SELECTOR } from './changes';
 
 export function decorateCodeBlocks(root: HTMLElement, copyButton: boolean): void {
   if (!copyButton) return;
   for (const pre of root.querySelectorAll<HTMLPreElement>('pre.rm-code')) {
+    if (pre.closest(REMOVED_SELECTOR)) continue;
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'rm-copy';

@@ -15,6 +15,7 @@ A reading-focused Markdown preview for VS Code, built for the long documents AI 
 - **Code highlighting** with a copy button, **Mermaid diagrams**, GitHub alerts (`> [!NOTE]`), task lists, footnotes, front matter.
 - **Live refresh**: the preview updates as you type, and also when the file changes on disk (e.g. an agent rewrites it).
 - **Edit in the preview** (opt-in, `readMarkdown.edit.enabled`): fix a paragraph, list, table, code block or front matter without leaving the preview. See [Editing in the preview](#editing-in-the-preview).
+- **Track changes against git**: for a git-tracked file, the preview shows what you have not staged yet, like Word's track changes: removed text struck through in red, added text in green, moved blocks double-struck in red where they were and double-underlined in green where they are now, joined by a yellow arrow, with change bars beside the text. See [Changes against git](#changes-against-git).
 
 ## Usage
 
@@ -53,6 +54,22 @@ To also open a block by double-clicking it, turn on `readMarkdown.edit.doubleCli
 - If the file changes while a block is open (you type in the source editor, or an agent rewrites the file), saving is refused. Copy your text, then cancel to reload the block.
 - Read-only documents (e.g. Git history) cannot be edited.
 
+### Changes against git
+
+When a file is tracked by git and differs from its staged version (the git index, the same version the editor's gutter bars compare against), the preview marks the differences:
+
+- Changed words: the old words struck through on red, the new ones on green.
+- Added blocks or list items: green. Removed ones are shown in place, struck through on red.
+- Moved paragraphs, list items and other blocks: double strikethrough in red where they were, double underline in green where they are now, and a yellow arrow in the left margin from the old place to the new one. Hovering either end outlines both and highlights the arrow; the ↑/↓ button beside it jumps there.
+- Code blocks are compared line by line, tables cell by cell.
+- A bar beside each change: green added, blue modified, red removed, green moved. The same marks appear on the scrollbar, like the editor's overview ruler, so you can see where the changes are in a long file.
+
+Staging the file clears the marks; they come back for anything you change afterwards. Files that are untracked, ignored or outside a repository show no marks.
+
+The ± button in the preview toolbar switches that preview between inline changes and bars only. `readMarkdown.changes.mode` sets the default: `inline`, `gutter` (bars only) or `off`. Removed text is shown for reference only: it is not part of the document, so it is skipped by search highlighting, the outline and block editing.
+
+Clicking a changed file in the Source Control view still opens VS Code's own text diff, which extensions cannot replace. Open the file from the Explorer (or with **Read Markdown: Open Preview**) to see the changes in the preview.
+
 ### About search sync
 
 VS Code does not expose the Find widget's text to extensions. Read Markdown mirrors the **editor selection** instead. Typing in the Find widget and pressing `Enter`/`F3` selects each match, so the preview follows along. Inside the preview you can also press `Ctrl+F` to use the webview's own find.
@@ -76,6 +93,7 @@ All settings live under `readMarkdown.*`. Search "Read Markdown" in the Settings
 | `sections.collapsible`, `sections.startCollapsedBelowLevel` | `true`, `0` | Folding |
 | `code.copyButton`, `mermaid.enabled`, `preview.scrollSync` | `true` | Extras |
 | `edit.enabled`, `edit.doubleClick`, `edit.saveOnCommit` | `false`, `false`, `false` | [Editing in the preview](#editing-in-the-preview) |
+| `changes.mode` | `inline` | `inline`, `gutter`, `off`: [Changes against git](#changes-against-git) |
 
 Example:
 
@@ -86,7 +104,7 @@ Example:
 "readMarkdown.customCss.inline": ".rm-markdown p { text-align: justify; }"
 ```
 
-Custom CSS can target `.rm-markdown` (content), `#rm-nav` (outline), `.rm-section`, `.rm-heading`, `pre.rm-code`, `.rm-edit` (the in-place block editor) and the `--rm-*` CSS variables.
+Custom CSS can target `.rm-markdown` (content), `#rm-nav` (outline), `.rm-section`, `.rm-heading`, `pre.rm-code`, `.rm-edit` (the in-place block editor) and the `--rm-*` CSS variables. For changes against git: `ins.rm-ins` / `del.rm-del` (changed words), `.rm-chg-ins`, `.rm-chg-del`, `.rm-chg-mod`, `.rm-chg-move-from`, `.rm-chg-move-to` (blocks), `.rm-chg-bar` (bars), and the colors `--rm-chg-ins-bg`, `--rm-chg-del-bg`, `--rm-chg-del-line`, `--rm-chg-move`, `--rm-chg-move-arrow`, `--rm-chg-added`, `--rm-chg-modified`, `--rm-chg-deleted`.
 
 ## Development
 

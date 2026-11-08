@@ -87,6 +87,17 @@ const CONTROLS: Control[] = [
   },
   { kind: 'checkbox', key: 'edit.enabled', label: 'Edit blocks in preview (✎)', get: (c) => c.editable },
   { kind: 'checkbox', key: 'edit.doubleClick', label: 'Double-click to edit', get: (c) => c.editDoubleClick, parent: (c) => c.editable },
+  {
+    kind: 'select',
+    key: 'changes.mode',
+    label: 'Changes vs git',
+    options: [
+      ['inline', 'Inline'],
+      ['gutter', 'Bars only'],
+      ['off', 'Off'],
+    ],
+    get: (c) => c.changesMode,
+  },
 ];
 
 let panel: HTMLElement;

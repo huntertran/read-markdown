@@ -9,6 +9,7 @@
 // shown; on failure the items are put back.
 import type { EditError, ToWebview } from '../src/protocol';
 import { post } from './api';
+import { REMOVED_SELECTOR } from './changes';
 import { invalidate } from './scroll';
 
 interface Options {
@@ -37,7 +38,8 @@ interface Drag {
 
 interface Pending {
   list: HTMLElement;
-  items: HTMLLIElement[];
+  /** The list's children before the optimistic reorder, to put back if the move fails. */
+  children: Element[];
   /** Re-show and focus the grip on the moved item once the new render is in (keyboard moves). */
   refocus: boolean;
 }
@@ -159,9 +161,10 @@ export function onMoveResult(msg: Extract<ToWebview, { type: 'moveResult' }>): v
   pending = undefined;
   if (!p) return;
   if (!msg.ok) {
-    // Put the items back in their original order (the content was not re-rendered).
-    if (p.items.every((li) => li.parentElement === p.list)) {
-      for (const li of p.items) p.list.append(li);
+    // Put the items back in their original order (the content was not re-rendered), with any
+    // track-changes copies between them where they were.
+    if (p.children.every((c) => c.parentElement === p.list)) {
+      for (const c of p.children) p.list.append(c);
       invalidate();
     }
     flash(p.list, MESSAGES[msg.error ?? 'failed']);
@@ -194,8 +197,9 @@ function movableItem(el: Element): HTMLLIElement | undefined {
   return li;
 }
 
+/** The list's real items: removed / moved-from copies shown by track changes are not in the source. */
 function siblings(list: Element): HTMLLIElement[] {
-  return [...list.children].filter((c): c is HTMLLIElement => c.tagName === 'LI');
+  return [...list.children].filter((c): c is HTMLLIElement => c.tagName === 'LI' && !c.matches(REMOVED_SELECTOR));
 }
 
 function showGrip(li: HTMLLIElement): void {
@@ -236,7 +240,7 @@ function onGripKey(e: KeyboardEvent): void {
 
   const animate = !reducedMotion.matches;
   const before = new Map(items.map((el) => [el, el.getBoundingClientRect().top]));
-  reorder(list, items, from, to);
+  const previous = reorder(list, items, from, to);
   // Measure the grip's new spot before the animation offsets the item.
   showGrip(li);
   if (animate) {
@@ -245,7 +249,7 @@ function onGripKey(e: KeyboardEvent): void {
       if (Math.abs(dy) >= 0.5) el.animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }], { duration: SETTLE_MS, easing: EASE });
     }
   }
-  send(list, items, from, to, true);
+  send(list, items, previous, from, to, true);
 }
 
 // ---- pointer drag ------------------------------------------------------------------------------
@@ -255,6 +259,8 @@ function onPointerDown(e: PointerEvent): void {
   if (e.button !== 0 || !li || !li.isConnected || drag || pending || settling || opts.isBusy()) return;
   e.preventDefault();
   const list = li.parentElement!;
+  // Before measuring: this also hides track-changes copies, which would skew the item slots.
+  list.classList.add('rm-list-reordering');
   const items = siblings(list);
   const rects = items.map((el) => el.getBoundingClientRect());
   drag = {
@@ -278,7 +284,6 @@ function onPointerDown(e: PointerEvent): void {
   // Keep the grip rendered (it holds the pointer capture), just invisible.
   grip.classList.add('rm-item-grip-dragging');
   document.body.classList.add('rm-list-dragging');
-  list.classList.add('rm-list-reordering');
   if (drag.reduced) {
     li.classList.add('rm-li-drag-source');
     const line = document.createElement('div');
@@ -396,10 +401,10 @@ function finish(cancel: boolean, immediate = false): void {
       el.style.transition = 'none';
       el.style.transform = '';
     }
-    if (to !== d.idx) reorder(d.list, d.items, d.idx, to);
+    const previous = to !== d.idx ? reorder(d.list, d.items, d.idx, to) : [];
     void d.list.offsetHeight;
     for (const el of d.items) el.style.transition = '';
-    if (to !== d.idx && !immediate) send(d.list, d.items, d.idx, to, false);
+    if (to !== d.idx && !immediate) send(d.list, d.items, previous, d.idx, to, false);
   };
 
   if (d.reduced || immediate) return done();
@@ -428,18 +433,20 @@ function finish(cancel: boolean, immediate = false): void {
 
 // ---- commit ----------------------------------------------------------------------------------
 
-/** Moves `items[from]` to position `to` in the DOM. */
-function reorder(list: HTMLElement, items: HTMLLIElement[], from: number, to: number): void {
+/** Moves `items[from]` to position `to` in the DOM. Returns the list's children as they were. */
+function reorder(list: HTMLElement, items: HTMLLIElement[], from: number, to: number): Element[] {
+  const previous = [...list.children];
   const rest = items.filter((_, i) => i !== from);
   list.insertBefore(items[from], rest[to] ?? null);
   invalidate();
+  return previous;
 }
 
-function send(list: HTMLElement, items: HTMLLIElement[], from: number, to: number, refocus: boolean): void {
+function send(list: HTMLElement, items: HTMLLIElement[], previous: Element[], from: number, to: number, refocus: boolean): void {
   const docVersion = opts.docVersion();
   const starts = items.map((li) => Number(li.dataset.line));
   const end = Number(items[items.length - 1].dataset.itemEnd);
-  pending = { list, items, refocus };
+  pending = { list, children: previous, refocus };
   if (docVersion === undefined) {
     onMoveResult({ type: 'moveResult', ok: false, error: 'failed' });
     return;

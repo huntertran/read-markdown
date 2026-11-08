@@ -228,15 +228,57 @@ body.rm-nav-resizing {
   gap: 2px;
   padding: 2px;
   font-family: var(--rm-ui-font);
-  background: color-mix(in srgb, var(--rm-bg) 85%, transparent);
+  background: color-mix(in srgb, var(--rm-bg) 47%, transparent);
   border-radius: 6px;
+  transition: background 0.15s;
+}
+
+/* Faded until hovered; the buttons fade rather than the strip so the changes toggle can stay vivid. */
+#rm-toolbar > * {
   opacity: 0.55;
   transition: opacity 0.15s;
 }
 
 #rm-toolbar:hover,
 #rm-toolbar:focus-within {
+  background: color-mix(in srgb, var(--rm-bg) 85%, transparent);
+}
+
+#rm-toolbar > #rm-toggle-changes,
+#rm-toolbar:hover > *,
+#rm-toolbar:focus-within > * {
   opacity: 1;
+}
+
+/* Changes toggle: green + / red −, tinted while changes are shown inline, faded in bars-only mode. */
+#rm-toggle-changes .rm-chg-icon-plus {
+  stroke: var(--rm-chg-move);
+}
+
+#rm-toggle-changes .rm-chg-icon-minus {
+  stroke: var(--rm-chg-del-line);
+}
+
+#rm-toggle-changes .rm-chg-icon-slash {
+  stroke: var(--rm-muted);
+  opacity: 0.6;
+}
+
+#rm-toggle-changes[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--rm-chg-move) 14%, transparent);
+  border-color: color-mix(in srgb, var(--rm-chg-move) 35%, transparent);
+}
+
+#rm-toggle-changes[aria-pressed='true']:hover {
+  background: color-mix(in srgb, var(--rm-chg-move) 22%, transparent);
+}
+
+#rm-toggle-changes[aria-pressed='false'] svg {
+  opacity: 0.45;
+}
+
+#rm-toggle-changes[aria-pressed='false']:hover svg {
+  opacity: 0.8;
 }
 
 body.rm-nav-visible[data-nav-position='right'] #rm-toolbar {
@@ -266,6 +308,10 @@ body.rm-nav-visible[data-nav-position='right'] #rm-toolbar {
 
 /* While a search is active keep the toolbar fully visible. */
 #rm-toolbar:has(#rm-search-badge:not([hidden])) {
+  background: color-mix(in srgb, var(--rm-bg) 85%, transparent);
+}
+
+#rm-toolbar:has(#rm-search-badge:not([hidden])) > * {
   opacity: 1;
 }
 
@@ -1024,6 +1070,11 @@ body.rm-list-dragging * {
   transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
+/* Track-changes copies (removed / moved-from items) step aside while their list is being reordered. */
+.rm-markdown .rm-list-reordering > li:is(.rm-chg-del, .rm-chg-move-from) {
+  display: none;
+}
+
 .rm-markdown li.rm-li-lifted {
   position: relative;
   z-index: 4;
@@ -1200,13 +1251,234 @@ body.rm-list-dragging * {
   .rm-block-rail,
   .rm-block-menu,
   .rm-item-grip,
-  .rm-drop-line {
+  .rm-drop-line,
+  .rm-move-jump {
     display: none !important;
   }
 
   .rm-collapsed > .rm-section-body {
     display: block;
   }
+}
+
+/* ---- changes vs git index (track changes) ---------------------------------------------- */
+
+:root {
+  --rm-chg-added: var(--vscode-editorGutter-addedBackground, #2ea043);
+  --rm-chg-modified: var(--vscode-editorGutter-modifiedBackground, #1b81a8);
+  --rm-chg-deleted: var(--vscode-editorGutter-deletedBackground, #f85149);
+  --rm-chg-ins-bg: color-mix(in srgb, #2ea043 22%, transparent);
+  --rm-chg-del-bg: color-mix(in srgb, #f85149 20%, transparent);
+  --rm-chg-del-line: #cf222e;
+  --rm-chg-move: #1a7f37;
+  --rm-chg-move-arrow: #bf8700;
+}
+
+body[data-scheme='dark'] {
+  --rm-chg-ins-bg: color-mix(in srgb, #3fb950 26%, transparent);
+  --rm-chg-del-bg: color-mix(in srgb, #f85149 26%, transparent);
+  --rm-chg-del-line: #ff7b72;
+  --rm-chg-move: #3fb950;
+  --rm-chg-move-arrow: #e3b341;
+}
+
+body[data-preset='high-contrast'] {
+  --rm-chg-ins-bg: color-mix(in srgb, #3fb950 40%, transparent);
+  --rm-chg-del-bg: color-mix(in srgb, #f85149 40%, transparent);
+}
+
+#rm-main {
+  position: relative;
+}
+
+/* Inline: added blocks and words highlighted green, removed ones red and struck through. */
+body[data-changes='inline'] .rm-markdown .rm-chg-ins,
+.rm-markdown ins.rm-ins {
+  background-color: var(--rm-chg-ins-bg);
+  text-decoration: none;
+}
+
+body[data-changes='inline'] .rm-markdown .rm-chg-ins {
+  border-radius: 3px;
+  box-shadow: 0 0 0 3px var(--rm-chg-ins-bg);
+}
+
+body[data-changes='inline'] .rm-markdown .rm-chg-del,
+.rm-markdown del.rm-del {
+  background-color: var(--rm-chg-del-bg);
+  text-decoration-line: line-through;
+  text-decoration-color: var(--rm-chg-del-line);
+}
+
+body[data-changes='inline'] .rm-markdown .rm-chg-del {
+  border-radius: 3px;
+  box-shadow: 0 0 0 3px var(--rm-chg-del-bg);
+}
+
+.rm-markdown ins.rm-ins,
+.rm-markdown del.rm-del {
+  border-radius: 2px;
+}
+
+/* A replaced word: keep the old and new text visibly apart. */
+.rm-markdown del.rm-del:has(+ ins.rm-ins) {
+  margin-inline-end: 2px;
+}
+
+/*
+ * Moved: double strikethrough in red where it was, double underline in green where it is now,
+ * joined by a yellow arrow in the left gutter.
+ */
+.rm-markdown .rm-chg-move-from {
+  --rm-chg-pair-color: var(--rm-chg-del-line);
+}
+
+.rm-markdown .rm-chg-move-to {
+  --rm-chg-pair-color: var(--rm-chg-move);
+}
+
+body[data-changes='inline'] .rm-markdown .rm-chg-move-from,
+body[data-changes='inline'] .rm-markdown .rm-chg-move-to {
+  color: var(--rm-chg-pair-color);
+  text-decoration-color: var(--rm-chg-pair-color);
+  text-decoration-style: double;
+}
+
+body[data-changes='inline'] .rm-markdown .rm-chg-move-from {
+  text-decoration-line: line-through;
+}
+
+body[data-changes='inline'] .rm-markdown .rm-chg-move-to {
+  text-decoration-line: underline;
+  text-underline-offset: 3px;
+}
+
+.rm-markdown .rm-chg-pair {
+  outline: 2px solid var(--rm-chg-pair-color, var(--rm-chg-move));
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+.rm-markdown .rm-chg-flash {
+  animation: rm-chg-flash 1.2s ease-out;
+}
+
+@keyframes rm-chg-flash {
+  from {
+    outline: 3px solid var(--rm-chg-pair-color, var(--rm-chg-move));
+    outline-offset: 3px;
+  }
+  to {
+    outline: 3px solid transparent;
+    outline-offset: 3px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rm-markdown .rm-chg-flash {
+    animation: none;
+  }
+}
+
+/* Bars beside the text, like the editor gutter; positioned by webview/changeGutter.ts. */
+#rm-change-gutter {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.rm-chg-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3px;
+  margin-left: -12px;
+  border-radius: 1px;
+  background: var(--rm-chg-modified);
+}
+
+.rm-chg-bar[data-kind='added'],
+.rm-chg-bar[data-kind='moved'] {
+  background: var(--rm-chg-added);
+}
+
+.rm-chg-bar[data-kind='removed'] {
+  background: var(--rm-chg-deleted);
+}
+
+/* Removed content not shown inline: a small triangle where it used to be. */
+.rm-chg-bar[data-kind='deleted'] {
+  width: 0;
+  height: 0;
+  margin-top: -5px;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 6px solid var(--rm-chg-deleted);
+  border-radius: 0;
+  background: none;
+}
+
+/* Connector from a moved block's old place to its new one (webview/changeGutter.ts). */
+.rm-move-arrows {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+}
+
+.rm-move-arrow {
+  fill: none;
+  stroke: var(--rm-chg-move-arrow);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.75;
+  transition: opacity 0.15s;
+}
+
+.rm-move-arrow-active {
+  stroke-width: 2.5;
+  opacity: 1;
+}
+
+.rm-move-jump {
+  position: absolute;
+  top: 0;
+  left: 0;
+  margin-left: 6px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  font: 12px/1 var(--rm-ui-font);
+  color: var(--rm-chg-move);
+  background: var(--rm-bg);
+  border: 1px solid var(--rm-chg-move);
+  border-radius: 4px;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.rm-move-jump:hover,
+.rm-move-jump:focus-visible {
+  color: var(--rm-bg);
+  background: var(--rm-chg-move);
+}
+
+/* On the old place: red, like the struck-through block it sits beside. */
+.rm-move-jump[data-side='from'] {
+  color: var(--rm-chg-del-line);
+  border-color: var(--rm-chg-del-line);
+}
+
+.rm-move-jump[data-side='from']:hover,
+.rm-move-jump[data-side='from']:focus-visible {
+  color: var(--rm-bg);
+  background: var(--rm-chg-del-line);
 }
 
 /* Yellow accent in high contrast: dark check mark instead of white. */

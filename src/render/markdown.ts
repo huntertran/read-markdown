@@ -2,6 +2,7 @@ import MarkdownIt, { type Token } from 'markdown-it';
 import footnote from 'markdown-it-footnote';
 import taskLists from 'markdown-it-task-lists';
 import hljs from 'highlight.js/lib/common';
+import type { SourceBlock } from '../diff/blockDiff';
 import type { Heading } from '../protocol';
 import { Slugger, headingText } from './headings';
 
@@ -21,6 +22,8 @@ export interface RenderResult {
   hasMermaid: boolean;
   /** Sorted, unique 0-based source lines that start a rendered block (`data-line`). */
   blockLines: number[];
+  /** Top-level blocks (the elements with `data-line-end`) in document order, with their source text. */
+  topBlocks: SourceBlock[];
 }
 
 interface RenderEnv {
@@ -28,12 +31,14 @@ interface RenderEnv {
   headings: Heading[];
   hasMermaid: boolean;
   blockLines: Set<number>;
+  topBlocks: SourceBlock[];
 }
 
 const FRONT_MATTER = /^---[ \t]*\r?\n([\s\S]*?)\r?\n(?:---|\.\.\.)[ \t]*(?:\r?\n|$)/;
 const HAS_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
 const BLOCK_LEAVES = new Set(['fence', 'code_block', 'hr', 'html_block']);
 const ALERT = /^\[!(note|tip|important|warning|caution)\][ \t]*/i;
+const LINE_BREAK = /\r?\n/;
 
 export function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -53,12 +58,19 @@ export function createMarkdownRenderer(): (source: string, options: RenderOption
   // ranges are disjoint, unlike nested blocks (list items, blockquote paragraphs).
   md.core.ruler.push('rm_source_map', (state) => {
     const env = getEnv(state.env);
+    let lines: string[] | undefined;
     for (const token of state.tokens) {
       if (!token.map || !token.block) continue;
       if (token.nesting === 1 || BLOCK_LEAVES.has(token.type)) {
         const line = token.map[0];
         token.attrSet('data-line', String(line));
-        if (token.level === 0) token.attrSet('data-line-end', String(token.map[1]));
+        if (token.level === 0) {
+          token.attrSet('data-line-end', String(token.map[1]));
+          lines ??= state.src.split(LINE_BREAK);
+          // Source text for diffing against another version (see `diff/blockDiff.ts`).
+          const text = lines.slice(line, token.map[1]).join('\n').trimEnd();
+          env.topBlocks?.push({ line, end: token.map[1], kind: token.type, text });
+        }
         // List items get their own end line (not `data-line-end`, which marks editable top-level
         // blocks) so the preview can reorder them; it includes nested lists and trailing blanks.
         else if (token.type === 'list_item_open') token.attrSet('data-item-end', String(token.map[1]));
@@ -158,7 +170,7 @@ export function createMarkdownRenderer(): (source: string, options: RenderOption
   };
 
   return (source: string, options: RenderOptions): RenderResult => {
-    const env: RenderEnv = { options, headings: [], hasMermaid: false, blockLines: new Set() };
+    const env: RenderEnv = { options, headings: [], hasMermaid: false, blockLines: new Set(), topBlocks: [] };
     let prefix = '';
     const fm = FRONT_MATTER.exec(source);
     if (fm) {
@@ -169,6 +181,7 @@ export function createMarkdownRenderer(): (source: string, options: RenderOption
       const end = /\n$/.test(fm[0]) ? lineCount : lineCount + 1;
       prefix = `<details class="rm-frontmatter" data-line="0" data-line-end="${end}"><summary>Front matter</summary><pre class="rm-code"><code class="hljs language-yaml">${safeHighlight(fm[1], 'yaml')}</code></pre></details>\n`;
       env.blockLines.add(0);
+      env.topBlocks.push({ line: 0, end, kind: 'front_matter', text: fm[1] });
     }
     const html = prefix + md.render(source, env as unknown as Record<string, unknown>);
     return {
@@ -176,6 +189,8 @@ export function createMarkdownRenderer(): (source: string, options: RenderOption
       headings: env.headings,
       hasMermaid: env.hasMermaid,
       blockLines: [...env.blockLines].sort((a, b) => a - b),
+      // Front matter is pushed after the body blocks; keep document order.
+      topBlocks: env.topBlocks.sort((a, b) => a.line - b.line),
     };
   };
 }

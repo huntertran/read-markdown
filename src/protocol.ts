@@ -37,6 +37,29 @@ export interface UiConfig {
   editable: boolean;
   /** Double-click opens a block for editing (`readMarkdown.edit.doubleClick`); only acts when `editable`. */
   editDoubleClick: boolean;
+  /** How changes against the git index are shown (`readMarkdown.changes.mode`). */
+  changesMode: ChangesMode;
+}
+
+export type ChangesMode = 'inline' | 'gutter' | 'off';
+
+/**
+ * One changed top-level block, by 0-based source line: `line` in the current document, `oldLine`
+ * in the original (git index) version. `before` = line of the current block a removed block is
+ * shown in front of (`null` = at the end). Unchanged blocks have no entry.
+ */
+export type BlockChange =
+  | { op: 'ins'; line: number }
+  | { op: 'del'; oldLine: number; before: number | null }
+  | { op: 'modify'; oldLine: number; line: number }
+  | { op: 'moveFrom'; oldLine: number; before: number | null; id: number }
+  | { op: 'moveTo'; oldLine: number; line: number; id: number; edited: boolean };
+
+/** Changes of the rendered document against its git index version. */
+export interface DocChanges {
+  /** The original version rendered like the current one (same `data-line` stamping). */
+  originalHtml: string;
+  ops: BlockChange[];
 }
 
 /** Keys the webview quick panel may change (relative to `readMarkdown.`). */
@@ -55,11 +78,12 @@ export const QUICK_SETTING_KEYS = [
   'table.headerTextColor',
   'edit.enabled',
   'edit.doubleClick',
+  'changes.mode',
 ] as const;
 export type QuickSettingKey = (typeof QUICK_SETTING_KEYS)[number];
 
 export type ToWebview =
-  | { type: 'render'; html: string; headings: Heading[]; hasMermaid: boolean; docVersion: number }
+  | { type: 'render'; html: string; headings: Heading[]; hasMermaid: boolean; docVersion: number; changes?: DocChanges }
   | { type: 'config'; css: string; customCss: string; ui: UiConfig }
   | { type: 'highlight'; term: string; caseSensitive: boolean; blockLine: number; occurrence: number }
   | { type: 'scrollToLine'; line: number }
@@ -70,6 +94,8 @@ export type ToWebview =
   | { type: 'editResult'; start: number; end: number; ok: boolean; error?: EditError }
   /** Reply to `toggleTask`. */
   | { type: 'taskResult'; line: number; ok: boolean; error?: EditError }
+  /** Switch this preview between inline track changes and gutter bars (`readMarkdown.toggleChanges`). */
+  | { type: 'toggleChanges' }
   /** Open the top-level block starting at source `line` for editing (preview context menu). */
   | { type: 'startEdit'; line: number }
   /** Reply to `moveListItem`; `line` is the moved item's new start line. */
@@ -118,4 +144,6 @@ export interface WebviewState {
   uri: string;
   scrollLine?: number;
   collapsed?: string[];
+  /** This preview's override of `readMarkdown.changes.mode` (toolbar toggle). */
+  changesMode?: 'inline' | 'gutter';
 }

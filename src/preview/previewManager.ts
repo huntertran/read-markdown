@@ -5,6 +5,7 @@ import { type Settings, getSettings, toUiConfig, updateSetting, validateQuickSet
 import { buildCssVariables } from '../config/styles';
 import type { ToWebview, WebviewState } from '../protocol';
 import { type RenderOptions, type RenderResult, createMarkdownRenderer } from '../render/markdown';
+import { GitBaseline } from '../scm/gitBaseline';
 import { PREVIEW_VIEW_TYPE, PreviewPanel } from './previewPanel';
 
 const MARKDOWN_EXT = /\.(md|markdown|mdown|mkd|mkdn)$/i;
@@ -20,6 +21,8 @@ export class PreviewManager implements vscode.Disposable {
   private readonly disposables: vscode.Disposable[] = [];
   private readonly renderer = createMarkdownRenderer();
   private readonly customCss = new CustomCssProvider();
+  /** Git index versions, for showing changes in the preview. */
+  readonly baseline = new GitBaseline();
   private readonly ignoreEditorScrollUntil = new WeakMap<vscode.TextEditor, number>();
   private readonly autoOpened = new Set<string>();
   private active: PreviewPanel | undefined;
@@ -30,6 +33,11 @@ export class PreviewManager implements vscode.Disposable {
     this.disposables.push(
       this.customCss,
       this.customCss.onDidChange(() => this.broadcastConfig()),
+      this.baseline,
+      this.baseline.onDidChange((uri) => {
+        if (this.settings.changesMode === 'off') return;
+        for (const p of uri ? this.panelsFor(uri) : this.panels) p.scheduleRender();
+      }),
       vscode.workspace.onDidChangeTextDocument((e) => {
         if (e.contentChanges.length === 0) return;
         for (const p of this.panelsFor(e.document.uri)) p.scheduleRender();
@@ -143,7 +151,9 @@ export class PreviewManager implements vscode.Disposable {
     this.settings = getSettings();
     this.customCss.configure(this.settings.customCssFiles, this.settings.customCssInline);
     this.broadcastConfig();
-    if (prev.mermaid !== this.settings.mermaid) for (const p of this.panels) void p.render();
+    if (prev.mermaid !== this.settings.mermaid || prev.changesMode !== this.settings.changesMode) {
+      for (const p of this.panels) void p.render();
+    }
     if (prev.searchSyncSelection && !this.settings.searchSyncSelection) for (const p of this.panels) p.clearHighlight();
   }
 
@@ -155,6 +165,11 @@ export class PreviewManager implements vscode.Disposable {
 
   async toggleNav(): Promise<void> {
     await updateSetting('nav.show', !this.settings.navShow);
+  }
+
+  /** Switches the focused preview between inline track changes and gutter bars. */
+  toggleChanges(): void {
+    (this.activePanel ?? this.lastActivePanel)?.toggleChanges();
   }
 
   // ---- source editor interaction ---------------------------------------------------------
