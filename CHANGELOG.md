@@ -1,16 +1,15 @@
 # Changelog
 
-## Unreleased
+## 0.4.0
 
 - Track changes against git: a git-tracked file opened in the preview shows how it differs from its staged
   version, Word style. Removed words are struck through on red, added ones highlighted green, removed blocks
   stay visible in place, and moved paragraphs / list items are double-struck in red where they were and
   double-underlined in green where they are now, joined by a yellow arrow in the margin (hover pairs
-  them, ↑/↓ jumps). Code blocks compare line by line,
-  tables cell by cell, change bars sit beside the text, and the scrollbar marks where the changes are. The ± toolbar button switches a preview to bars
+  them, ↑/↓ jumps). Code blocks compare line by line, tables cell by cell, change bars sit beside the
+  text, and the scrollbar marks where the changes are. The ± toolbar button switches a preview to bars
   only; `readMarkdown.changes.mode` (`inline` / `gutter` / `off`) sets the default. Clicking a file in the
   Source Control view still opens VS Code's text diff.
-
 - Reorder list items in the preview (edit mode): drag the ⠿ grip left of a bullet or checkbox, or press
   `Alt+↑`/`Alt+↓` on it. Siblings slide aside while you drag (a drop line instead when reduced motion is on).
   Nested items move along, numbered lists keep their numbers, and the move is a single undo step.
