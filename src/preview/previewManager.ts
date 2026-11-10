@@ -161,7 +161,11 @@ export class PreviewManager implements vscode.Disposable {
     this.settings = getSettings();
     this.customCss.configure(this.settings.customCssFiles, this.settings.customCssInline);
     this.broadcastConfig();
-    if (prev.mermaid !== this.settings.mermaid || prev.changesMode !== this.settings.changesMode) {
+    if (
+      prev.mermaid !== this.settings.mermaid ||
+      prev.changesMode !== this.settings.changesMode ||
+      prev.agentProgress !== this.settings.agentProgress
+    ) {
       for (const p of this.panels) void p.render();
     }
     if (prev.searchSyncSelection && !this.settings.searchSyncSelection) for (const p of this.panels) p.clearHighlight();

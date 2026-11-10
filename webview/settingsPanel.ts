@@ -98,6 +98,8 @@ const CONTROLS: Control[] = [
     ],
     get: (c) => c.changesMode,
   },
+  { kind: 'checkbox', key: 'tasks.agentProgress', label: 'Show agent progress on task lists', get: (c) => c.agentProgress },
+  { kind: 'checkbox', key: 'tasks.progress', label: 'Progress bar & outline counts', get: (c) => c.taskProgress, parent: (c) => c.agentProgress },
 ];
 
 let panel: HTMLElement;

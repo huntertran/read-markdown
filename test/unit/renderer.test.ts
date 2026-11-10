@@ -120,4 +120,40 @@ describe('markdown renderer', () => {
     assert.match(r.html, /task-list-item/);
     assert.match(r.html, /checked/);
   });
+
+  it('renders in-progress task items as unchecked items flagged active', () => {
+    for (const marker of ['/', '~', '-']) {
+      const r = render(`- [ ] todo\n- [${marker}] working \`on\` it\n- [x] done\n`, opts);
+      const items = r.html.match(/<li[^>]*>.*?<\/li>/g) ?? [];
+      assert.equal(items.length, 3, marker);
+      const open = items[1].slice(0, items[1].indexOf('>') + 1);
+      for (const attr of ['class="task-list-item"', 'data-line="1"', 'data-task="active"']) assert.ok(open.includes(attr), `${marker}: ${open}`);
+      assert.match(items[1], /<input class="task-list-item-checkbox" disabled="" type="checkbox"> working <code>on<\/code> it/, marker);
+      assert.doesNotMatch(items[1], /\[[/~-]\]/, marker);
+      assert.doesNotMatch(items[0] + items[2], /data-task/, marker);
+    }
+  });
+
+  it('flags in-progress items in nested, ordered, loose and quoted lists', () => {
+    const r = render('1. [/] parent\n   - [/] child\n\n2. [ ] next\n\n> - [~] quoted\n', opts);
+    assert.equal(r.html.match(/data-task="active"/g)?.length, 3);
+    assert.match(r.html, /<li data-task="active" class="task-list-item" data-line="0" data-item-end="3">/);
+    assert.match(r.html, /<li data-task="active" class="task-list-item" data-line="1" data-item-end="3">/);
+    assert.doesNotMatch(r.html, /\[[/~]\]/);
+  });
+
+  it('shows in-progress markers as plain text when activeTasks is off', () => {
+    const r = render('- [/] working\n- [x] done\n', { mermaid: true, activeTasks: false });
+    assert.doesNotMatch(r.html, /data-task/);
+    assert.match(r.html, /<li data-line="0" data-item-end="1">\[\/\] working<\/li>/);
+    assert.match(r.html, /checked/);
+  });
+
+  it('leaves in-progress markers alone where they are not task markers', () => {
+    for (const src of ['[/] not a list\n', '- text [/] later\n', '- [/]\n', '- [/]no space\n']) {
+      const r = render(src, opts);
+      assert.doesNotMatch(r.html, /data-task|task-list-item/, src);
+      assert.match(r.html, /\[\/\]/, src);
+    }
+  });
 });

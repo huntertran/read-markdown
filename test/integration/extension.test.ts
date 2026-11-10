@@ -129,6 +129,16 @@ describe('Read Markdown extension', () => {
       assert.deepEqual(await toggleTask(doc, 0, false, version - 1), { ok: false, error: 'stale' });
     });
 
+    it('checks an in-progress task item', async () => {
+      const doc = await untitled('- [/] one\n- [~] two\n1. [-] three\n');
+      // In progress counts as unchecked: unchecking is a no-op, checking marks it done.
+      const version = doc.version;
+      assert.deepEqual(await toggleTask(doc, 0, false, version), { ok: true });
+      assert.equal(doc.version, version);
+      for (const line of [0, 1, 2]) assert.deepEqual(await toggleTask(doc, line, true, doc.version), { ok: true });
+      assert.equal(doc.getText(), '- [x] one\n- [x] two\n1. [x] three\n');
+    });
+
     it('rejects edits against a stale version or a bad range', async () => {
       const doc = await untitled('para\n');
       const version = doc.version;

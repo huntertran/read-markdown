@@ -27,6 +27,8 @@ export interface Settings extends StyleSettings {
   editDoubleClick: boolean;
   editSaveOnCommit: boolean;
   changesMode: ChangesMode;
+  agentProgress: boolean;
+  taskProgress: boolean;
 }
 
 export function getSettings(scope?: vscode.ConfigurationScope): Settings {
@@ -69,6 +71,8 @@ export function getSettings(scope?: vscode.ConfigurationScope): Settings {
     editDoubleClick: c.get<boolean>('edit.doubleClick', false),
     editSaveOnCommit: c.get<boolean>('edit.saveOnCommit', false),
     changesMode: c.get<ChangesMode>('changes.mode', 'inline'),
+    agentProgress: c.get<boolean>('tasks.agentProgress', true),
+    taskProgress: c.get<boolean>('tasks.progress', true),
   };
 }
 
@@ -94,6 +98,8 @@ export function toUiConfig(s: Settings): UiConfig {
     editable: s.editEnabled,
     editDoubleClick: s.editDoubleClick,
     changesMode: s.changesMode,
+    agentProgress: s.agentProgress,
+    taskProgress: s.taskProgress,
   };
 }
 
@@ -111,6 +117,8 @@ export function validateQuickSetting(key: string, value: unknown): unknown {
     case 'nav.show':
     case 'edit.enabled':
     case 'edit.doubleClick':
+    case 'tasks.agentProgress':
+    case 'tasks.progress':
       return typeof value === 'boolean' ? value : undefined;
     case 'nav.position':
       return value === 'left' || value === 'right' ? value : undefined;

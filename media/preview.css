@@ -290,6 +290,7 @@ body.rm-nav-resizing {
 }
 
 #rm-toolbar > #rm-toggle-changes,
+#rm-toolbar > #rm-follow-tasks[aria-pressed='true'],
 #rm-toolbar:hover > *,
 #rm-toolbar:focus-within > * {
   opacity: 1;
@@ -590,6 +591,206 @@ body.rm-nav-visible[data-nav-position='right'] #rm-settings {
 
 .rm-markdown .task-list-item:has(> input[type='checkbox']:checked, > p:first-child > input[type='checkbox']:checked) code {
   opacity: 0.75;
+}
+
+/* ---- task progress (plans worked through by an AI agent) --------------------------- */
+
+/* In progress: `- [/] step` (also `[~]`, `[-]`). Tinted row, dashed checkbox, and "working" with
+   bouncing dots after the text. Drawn in CSS (not DOM text), so search, copy and the item keys in
+   taskProgress.ts never see it; it stays inside the row, clear of the reorder grip in the margin. */
+.rm-markdown .task-list-item[data-task='active'] > label,
+.rm-markdown .task-list-item[data-task='active'] > p:first-child > label {
+  /* Padding reaches back over the hanging checkbox (margin -1.5em) so the tint covers it; the equal
+     negative margin keeps checkbox and text aligned with the other items. */
+  margin-left: -1.8em;
+  padding: 0.05em 0.35em 0.05em 1.8em;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--rm-accent) 10%, transparent);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.rm-markdown .task-list-item[data-task='active'] > label > input[type='checkbox'],
+.rm-markdown .task-list-item[data-task='active'] > p:first-child > label > input[type='checkbox'] {
+  border-color: var(--rm-accent);
+  border-style: dashed;
+}
+
+/* Three dots as background layers on one pseudo-element, each bouncing in turn. */
+.rm-markdown .task-list-item[data-task='active'] > label::after,
+.rm-markdown .task-list-item[data-task='active'] > p:first-child > label::after {
+  content: 'working';
+  display: inline-block;
+  margin-left: 0.5em;
+  padding-right: 20px;
+  font-size: 0.8em;
+  line-height: 1;
+  color: var(--rm-accent);
+  white-space: nowrap;
+  background:
+    radial-gradient(circle, currentColor 0 2px, transparent 2.5px) right 12px bottom 0 / 5px 5px no-repeat,
+    radial-gradient(circle, currentColor 0 2px, transparent 2.5px) right 6px bottom 0 / 5px 5px no-repeat,
+    radial-gradient(circle, currentColor 0 2px, transparent 2.5px) right 0 bottom 0 / 5px 5px no-repeat;
+  animation: rm-task-dots 1.2s ease-in-out infinite;
+}
+
+@keyframes rm-task-dots {
+  0%,
+  60%,
+  100% {
+    background-position: right 12px bottom 0, right 6px bottom 0, right 0 bottom 0;
+  }
+  15% {
+    background-position: right 12px bottom 3px, right 6px bottom 0, right 0 bottom 0;
+  }
+  30% {
+    background-position: right 12px bottom 0, right 6px bottom 3px, right 0 bottom 0;
+  }
+  45% {
+    background-position: right 12px bottom 0, right 6px bottom 0, right 0 bottom 3px;
+  }
+}
+
+@keyframes rm-task-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--rm-accent) 55%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 0.45em transparent;
+  }
+}
+
+/* An in-progress step was just checked: the check mark pops and the row flashes. */
+.rm-markdown .rm-task-just-done > label,
+.rm-markdown .rm-task-just-done > p:first-child > label {
+  border-radius: 4px;
+  animation: rm-task-just-done 1.4s ease-out;
+}
+
+.rm-markdown .rm-task-just-done > label > input[type='checkbox'],
+.rm-markdown .rm-task-just-done > p:first-child > label > input[type='checkbox'] {
+  animation: rm-task-check-pop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+@keyframes rm-task-just-done {
+  from {
+    background: color-mix(in srgb, var(--rm-accent) 35%, transparent);
+  }
+  to {
+    background: transparent;
+  }
+}
+
+@keyframes rm-task-check-pop {
+  0% {
+    transform: scale(0.4);
+  }
+  60% {
+    transform: scale(1.3);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Thin bar at the top of the preview: done, then in progress (striped), then open. */
+#rm-task-progress {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  height: 3px;
+  margin: -28px -48px 25px;
+  background: color-mix(in srgb, var(--rm-muted) 18%, transparent);
+}
+
+#rm-task-progress[hidden] {
+  display: none;
+}
+
+#rm-task-progress > span {
+  height: 100%;
+  transition: width 0.4s ease;
+}
+
+.rm-task-progress-done {
+  width: var(--rm-task-done, 0%);
+  background: var(--rm-accent);
+}
+
+.rm-task-progress-active {
+  width: var(--rm-task-active, 0%);
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--rm-accent) 0 4px,
+    color-mix(in srgb, var(--rm-accent) 35%, transparent) 4px 8px
+  );
+  background-size: 11.3px 100%;
+  animation: rm-task-stripes 0.8s linear infinite;
+}
+
+@keyframes rm-task-stripes {
+  to {
+    background-position: 11.3px 0;
+  }
+}
+
+/* Outline: done/total per heading, pulsing dot while one of its steps is in progress. */
+.rm-nav-item {
+  position: relative;
+}
+
+.rm-nav-item.rm-nav-has-tasks a {
+  padding-right: 52px;
+}
+
+.rm-nav-tasks {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transform: translateY(-50%);
+  font-size: 0.85em;
+  font-variant-numeric: tabular-nums;
+  color: var(--rm-muted);
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.rm-nav-tasks-complete {
+  color: var(--rm-accent);
+}
+
+.rm-nav-tasks-active::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--rm-accent);
+  animation: rm-task-pulse 1.6s ease-out infinite;
+}
+
+/* Follow toggle: tinted while on. */
+#rm-follow-tasks[aria-pressed='true'] {
+  color: var(--rm-accent);
+  background: color-mix(in srgb, var(--rm-accent) 14%, transparent);
+  border-color: color-mix(in srgb, var(--rm-accent) 35%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rm-markdown .task-list-item[data-task='active'] label::after,
+  .rm-task-progress-active,
+  .rm-nav-tasks-active::before,
+  .rm-markdown .rm-task-just-done input[type='checkbox'] {
+    animation: none;
+  }
+
+  #rm-task-progress > span {
+    transition: none;
+  }
 }
 
 .rm-markdown strong {

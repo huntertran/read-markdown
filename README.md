@@ -18,6 +18,7 @@ A reading-focused Markdown preview for VS Code, built for the long documents AI 
 - **Live refresh**: the preview updates as you type, and also when the file changes on disk (e.g. an agent rewrites it).
 - **Edit in the preview** (opt-in, `readMarkdown.edit.enabled`): fix a paragraph, list, table, code block or front matter without leaving the preview. See [Editing in the preview](#editing-in-the-preview).
 - **Track changes against git**: for a git-tracked file, the preview shows what you have not staged yet, like Word's track changes: removed text struck through in red, added text in green, moved blocks double-struck in red where they were and double-underlined in green where they are now, joined by a yellow arrow, with change bars beside the text. See [Changes against git](#changes-against-git).
+- **Follow an AI agent through a plan**: task items marked in progress (`- [/] step`) are highlighted with an animated “working” label, the preview scrolls to each step as it starts, and a progress bar and outline counts show how far along the plan is. See [Following an agent's plan](#following-an-agents-plan).
 
 ![Selecting a word in the source highlights it in the preview; scrolling and Find stay in sync](docs/images/sync.gif)
 
@@ -78,6 +79,33 @@ The ± button in the preview toolbar switches that preview between inline change
 
 Clicking a changed file in the Source Control view still opens VS Code's own text diff, which extensions cannot replace. Open the file from the Explorer (or with **Read Markdown: Open Preview**) to see the changes in the preview.
 
+### Following an agent's plan
+
+AI coding agents often write a plan as a task list, then work through it one step at a time, or several independent steps in parallel. Have the agent mark the steps it is working on, and the preview shows where it is:
+
+| Source | Meaning | Preview |
+| --- | --- | --- |
+| `- [ ] step` | To do | Empty checkbox |
+| `- [/] step` (or `[~]`, `[-]`) | In progress | Highlighted row, dashed checkbox, “working” with animated dots |
+| `- [x] step` | Done | Checked; flashes when it was in progress a moment ago |
+
+The preview refreshes whenever the file changes on disk, so this works with any agent that edits the plan file. Several steps can be in progress at once, for parallel work; each is marked.
+
+- **Follow**: when a step becomes in progress, the preview scrolls to it and expands its section. It waits while you are scrolling or clicking, and does not move the source editor. The toolbar's follow button (shown while a step is in progress) turns this off for that preview.
+- **Progress**: a thin bar at the top of the preview (done, then in progress, striped), and `done/total` beside outline headings, with a pulsing dot on headings that contain a step in progress. Turn both off with `readMarkdown.tasks.progress` (**Progress bar & outline counts** in the ⚙ panel).
+- **Turn it all off** with `readMarkdown.tasks.agentProgress` (**Show agent progress on task lists** in the ⚙ panel): `[/]` is then shown as plain text, as on GitHub, and nothing follows, flashes or counts.
+- With editing on (`readMarkdown.edit.enabled`), clicking an in-progress step's checkbox marks it done.
+
+Tell your agent the convention, for example in `CLAUDE.md`, `AGENTS.md` or `.github/copilot-instructions.md`:
+
+```markdown
+When implementing a plan file with `- [ ]` steps: before starting a step, change its `[ ]` to `[/]`;
+when the step is done, change it to `[x]`. Mark steps you work on in parallel `[/]` together.
+Edit only the marker, never the step text.
+```
+
+GitHub and other Markdown renderers show `[/]` as plain text, so the plan stays readable everywhere.
+
 ### About search sync
 
 VS Code does not expose the Find widget's text to extensions. Read Markdown mirrors the **editor selection** instead. Typing in the Find widget and pressing `Enter`/`F3` selects each match, so the preview follows along. Inside the preview you can also press `Ctrl+F` to use the webview's own find.
@@ -104,6 +132,7 @@ All settings live under `readMarkdown.*`. Search "Read Markdown" in the Settings
 | `code.copyButton`, `mermaid.enabled`, `preview.scrollSync` | `true` | Extras |
 | `edit.enabled`, `edit.doubleClick`, `edit.saveOnCommit` | `false`, `false`, `false` | [Editing in the preview](#editing-in-the-preview) |
 | `changes.mode` | `inline` | `inline`, `gutter`, `off`: [Changes against git](#changes-against-git) |
+| `tasks.agentProgress`, `tasks.progress` | `true`, `true` | In-progress steps, follow and flash; progress bar and outline counts: [Following an agent's plan](#following-an-agents-plan) |
 
 Example:
 
@@ -114,7 +143,7 @@ Example:
 "readMarkdown.customCss.inline": ".rm-markdown p { text-align: justify; }"
 ```
 
-Custom CSS can target `.rm-markdown` (content), `#rm-nav` (outline), `.rm-section`, `.rm-heading`, `pre.rm-code`, `.rm-edit` (the in-place block editor) and the `--rm-*` CSS variables. For changes against git: `ins.rm-ins` / `del.rm-del` (changed words), `.rm-chg-ins`, `.rm-chg-del`, `.rm-chg-mod`, `.rm-chg-move-from`, `.rm-chg-move-to` (blocks), `.rm-chg-bar` (bars), and the colors `--rm-chg-ins-bg`, `--rm-chg-del-bg`, `--rm-chg-del-line`, `--rm-chg-move`, `--rm-chg-move-arrow`, `--rm-chg-added`, `--rm-chg-modified`, `--rm-chg-deleted`.
+Custom CSS can target `.rm-markdown` (content), `#rm-nav` (outline), `.rm-section`, `.rm-heading`, `pre.rm-code`, `.rm-edit` (the in-place block editor) and the `--rm-*` CSS variables. For changes against git: `ins.rm-ins` / `del.rm-del` (changed words), `.rm-chg-ins`, `.rm-chg-del`, `.rm-chg-mod`, `.rm-chg-move-from`, `.rm-chg-move-to` (blocks), `.rm-chg-bar` (bars), and the colors `--rm-chg-ins-bg`, `--rm-chg-del-bg`, `--rm-chg-del-line`, `--rm-chg-move`, `--rm-chg-move-arrow`, `--rm-chg-added`, `--rm-chg-modified`, `--rm-chg-deleted`. For task progress: `.task-list-item[data-task='active']` (in-progress step; its label's `::after` is the “working” label), `.rm-task-just-done`, `#rm-task-progress` (bar) and `.rm-nav-tasks` (outline counts).
 
 ## Development
 

@@ -139,6 +139,11 @@ export function isSuppressed(): boolean {
   return !pointerDown && now - lastUserInput > USER_INPUT_WINDOW_MS;
 }
 
+/** Milliseconds since the reader last scrolled, clicked or pressed a key in the preview. */
+export function msSinceUserInput(): number {
+  return pointerDown ? 0 : performance.now() - lastUserInput;
+}
+
 /** Treat the next scroll as user-initiated (e.g. clicking a heading in the outline). */
 export function markUserScroll(): void {
   markInput();

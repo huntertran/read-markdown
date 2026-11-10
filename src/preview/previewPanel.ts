@@ -23,7 +23,7 @@ export class PreviewPanel implements vscode.Disposable {
   private renderTimer: ReturnType<typeof setTimeout> | undefined;
   private lastRender: RenderResult | undefined;
   /** The git index version last rendered for change display, keyed by its source text. */
-  private originalRender: { source: string; result: RenderResult } | undefined;
+  private originalRender: { key: string; result: RenderResult } | undefined;
   /** Bumped per render so a slower, older render never overwrites a newer one. */
   private renderSeq = 0;
   private lastHighlightKey = '';
@@ -144,6 +144,7 @@ export class PreviewPanel implements vscode.Disposable {
     const source = doc.getText();
     const options: RenderOptions = {
       mermaid: this.manager.settings.mermaid,
+      activeTasks: this.manager.settings.agentProgress,
       resolveResource: (p) => this.resolveResource(p),
     };
     const result = this.manager.render(source, options);
@@ -165,8 +166,10 @@ export class PreviewPanel implements vscode.Disposable {
     if (this.manager.settings.changesMode === 'off') return undefined;
     const original = await this.manager.baseline.getOriginal(this.document.uri);
     if (original === undefined || eolNormalized(original) === eolNormalized(source)) return undefined;
-    if (this.originalRender?.source !== original) {
-      this.originalRender = { source: original, result: this.manager.render(original, options) };
+    // Re-render the original when it or a setting that changes rendering changed.
+    const key = JSON.stringify([original, options.mermaid, options.activeTasks]);
+    if (this.originalRender?.key !== key) {
+      this.originalRender = { key, result: this.manager.render(original, options) };
     }
     const ops = diffDocument(this.originalRender.result.topBlocks, current.topBlocks);
     return ops?.length ? { originalHtml: this.originalRender.result.html, ops } : undefined;

@@ -11,10 +11,11 @@ export function isValidBlockRange(start: unknown, end: unknown, lineCount: numbe
   );
 }
 
-// List item with a task marker, optionally inside blockquotes: `- [ ] a`, `> 1. [x] b`.
-const TASK_MARKER = /^((?:[ \t]*>)*[ \t]*(?:[-+*]|\d{1,9}[.)])[ \t]+\[)[ xX]\]/;
+// List item with a task marker, optionally inside blockquotes: `- [ ] a`, `> 1. [x] b`, and the
+// in-progress markers `[/]`, `[~]`, `[-]` (see `ACTIVE_TASK_MARKERS` in render/markdown.ts).
+const TASK_MARKER = /^((?:[ \t]*>)*[ \t]*(?:[-+*]|\d{1,9}[.)])[ \t]+\[)[ xX/~-]\]/;
 
-/** Column of the state character (` `, `x` or `X`) in a task list item line, or undefined. */
+/** Column of the state character (` `, `x`, `X`, or in progress `/`, `~`, `-`) in a task list item line, or undefined. */
 export function taskMarkerColumn(line: string): number | undefined {
   const m = TASK_MARKER.exec(line);
   return m ? m[1].length : undefined;

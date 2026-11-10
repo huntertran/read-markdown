@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.0
+
+- Follow an AI agent through a plan: task items marked in progress with `- [/]` (also `[~]`, `[-]`) are
+  highlighted with a dashed checkbox and an animated “working” label, so you can see which steps an agent is
+  working on, several at once for parallel work. The preview scrolls to each step as it starts (toolbar toggle), a step that was in
+  progress flashes when it is checked, a thin bar at the top shows done / in-progress / open, and outline
+  headings show `done/total` with a pulsing dot while one of their steps is in progress
+  (`readMarkdown.tasks.progress`). `readMarkdown.tasks.agentProgress` turns the whole feature off. In edit mode, clicking an in-progress checkbox marks it done.
+
 ## 0.4.1
 
 - Fixed: moving a list item in the preview could make the preview jump to the line at the top of the

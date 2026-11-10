@@ -7,13 +7,14 @@ import { decorateCodeBlocks, initCodeBlocks } from './codeblocks';
 import { deferRender, editBlockAtLine, initBlockEdit, isEditing, onBlockSource, onEditResult, onTaskResult, setEditable, syncTaskCheckboxes } from './editBlock';
 import { renderMermaid, rerenderMermaid } from './mermaid';
 import { cancelListDrag, initListDrag, onMoveResult, setListDragEnabled } from './listDrag';
-import { initNav, setHeadings, updateActive } from './nav';
+import { initNav, setHeadings, setTaskBadges, updateActive } from './nav';
 import { initNavResize, syncNavWidth } from './navResize';
 import { sanitize } from './sanitize';
 import { initScrollMap, invalidate, isSuppressed, lineAtTop, scrollProgrammatically, scrollToLine, updateAnchor } from './scroll';
 import { initSearch, reapplySearch, setSearch } from './search';
 import { buildSections, collapsedSlugs, expandTo, setAllCollapsed, setCollapsed } from './sections';
 import { initSettingsPanel, updateSettingsPanel } from './settingsPanel';
+import { initTaskProgress, updateTaskProgress } from './taskProgress';
 
 const content = $('rm-content');
 const body = document.body;
@@ -68,7 +69,11 @@ function applyConfig(msg: Extract<ToWebview, { type: 'config' }>): void {
 
   const needsRerender =
     prev &&
-    (prev.navMaxDepth !== ui.navMaxDepth || prev.collapsible !== ui.collapsible || prev.copyButton !== ui.copyButton);
+    (prev.navMaxDepth !== ui.navMaxDepth ||
+      prev.collapsible !== ui.collapsible ||
+      prev.copyButton !== ui.copyButton ||
+      prev.taskProgress !== ui.taskProgress ||
+      prev.agentProgress !== ui.agentProgress);
   if (needsRerender && lastRender) renderContent(lastRender);
 }
 
@@ -108,6 +113,8 @@ function renderContent(msg: Extract<ToWebview, { type: 'render' }>): void {
     scrollToLine(state.scrollLine);
   }
   rendered = true;
+  // After the scroll restore: following a newly started step may scroll and expand its section.
+  setTaskBadges(updateTaskProgress({ enabled: ui.agentProgress, progress: ui.taskProgress, busy: isEditing() }));
   saveCollapsed();
   reapplySearch(content);
   scheduleChangeGutter();
@@ -301,6 +308,7 @@ registerBlockAction({
 initBlockEdit({ content, docVersion: () => lastRender?.docVersion, render: renderContent });
 initListDrag({ content, docVersion: () => lastRender?.docVersion, isBusy: isEditing });
 initSettingsPanel($('rm-settings'), $('rm-open-settings'));
+initTaskProgress({ content, bar: $('rm-task-progress'), followButton: $('rm-follow-tasks') as HTMLButtonElement });
 initNav({
   list: $('rm-nav-list') as HTMLOListElement,
   empty: $('rm-nav-empty'),

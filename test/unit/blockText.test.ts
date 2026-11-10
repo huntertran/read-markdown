@@ -66,6 +66,12 @@ describe('taskMarkerColumn', () => {
     assert.equal(taskMarkerColumn('> > 1. [x] deep'), 8);
   });
 
+  it('finds in-progress markers', () => {
+    assert.equal(taskMarkerColumn('- [/] working'), 3);
+    assert.equal(taskMarkerColumn('  * [~] nested'), 5);
+    assert.equal(taskMarkerColumn('3. [-] numbered'), 4);
+  });
+
   it('ignores lines that are not task items', () => {
     assert.equal(taskMarkerColumn('[ ] no list marker'), undefined);
     assert.equal(taskMarkerColumn('- [y] not a state'), undefined);

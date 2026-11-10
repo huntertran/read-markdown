@@ -2,7 +2,7 @@
   "name": "read-markdown",
   "displayName": "Read Markdown",
   "description": "A reading-focused Markdown preview for long documents: heading navigation, collapsible sections, typography customization, search highlight sync, Mermaid and code highlighting.",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "publisher": "huntertran",
   "license": "GPL-3.0-only",
   "icon": "media/icon.png",
@@ -476,6 +476,18 @@
           "default": "inline",
           "markdownDescription": "Show how a git-tracked file differs from its staged (git index) version, like the change bars in the editor gutter. Clicking a file in the Source Control view still opens VS Code's text diff. The preview's ± toolbar button switches between `inline` and `gutter` for that preview.",
           "order": 90
+        },
+        "readMarkdown.tasks.agentProgress": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Follow an AI agent working through a plan: task items marked in progress with `- [/]` (also `[~]`, `[-]`) are highlighted with an animated “working” label, the preview scrolls to each step as it starts, and a step flashes when it is checked. When off, `[/]` is shown as plain text, as on GitHub.",
+          "order": 100
+        },
+        "readMarkdown.tasks.progress": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show a progress bar for task lists (done, in progress, open) and done/total counts beside outline headings. Only applies when `#readMarkdown.tasks.agentProgress#` is on.",
+          "order": 101
         }
       }
     }

@@ -39,6 +39,10 @@ export interface UiConfig {
   editDoubleClick: boolean;
   /** How changes against the git index are shown (`readMarkdown.changes.mode`). */
   changesMode: ChangesMode;
+  /** In-progress task items, follow and "just done" flash (`readMarkdown.tasks.agentProgress`). */
+  agentProgress: boolean;
+  /** Task progress bar and outline counts (`readMarkdown.tasks.progress`); only with `agentProgress`. */
+  taskProgress: boolean;
 }
 
 export type ChangesMode = 'inline' | 'gutter' | 'off';
@@ -79,6 +83,8 @@ export const QUICK_SETTING_KEYS = [
   'edit.enabled',
   'edit.doubleClick',
   'changes.mode',
+  'tasks.agentProgress',
+  'tasks.progress',
 ] as const;
 export type QuickSettingKey = (typeof QUICK_SETTING_KEYS)[number];
 
@@ -146,4 +152,6 @@ export interface WebviewState {
   collapsed?: string[];
   /** This preview's override of `readMarkdown.changes.mode` (toolbar toggle). */
   changesMode?: 'inline' | 'gutter';
+  /** Scroll to task items as they become in progress (toolbar toggle); undefined = on. */
+  followTasks?: boolean;
 }

@@ -12,6 +12,10 @@ const COLLAPSE_ALL_ICON =
 const EXPAND_ALL_ICON =
   '<svg class="rm-icon-expand" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M15 6V11C15 13.21 13.21 15 11 15H6C5.26 15 4.62 14.6 4.27 14H11C12.65 14 14 12.65 14 11V4.27C14.6 4.62 15 5.26 15 6ZM11 13H4C2.897 13 2 12.103 2 11V4C2 2.897 2.897 2 4 2H11C12.103 2 13 2.897 13 4V11C13 12.103 12.103 13 11 13ZM4 12H11C11.551 12 12 11.552 12 11V4C12 3.449 11.551 3 11 3H4C3.449 3 3 3.449 3 4V11C3 11.552 3.449 12 4 12ZM9.5 7H8V5.5C8 5.224 7.776 5 7.5 5C7.224 5 7 5.224 7 5.5V7H5.5C5.224 7 5 7.224 5 7.5C5 7.776 5.224 8 5.5 8H7V9.5C7 9.776 7.224 10 7.5 10C7.776 10 8 9.776 8 9.5V8H9.5C9.776 8 10 7.776 10 7.5C10 7.224 9.776 7 9.5 7Z"/></svg>';
 
+/** Follow-tasks toggle: arrow pointing at a list line. */
+const FOLLOW_ICON =
+  '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 8h5M4.5 5.5 7 8l-2.5 2.5"/><rect x="9" y="5.5" width="5" height="5" rx="1"/><path d="M9 2.5h5M9 13.5h5" opacity="0.5"/></svg>';
+
 /** Changes toggle: green plus, red minus (colors from `--rm-chg-*` in preview.css). */
 const CHANGES_ICON =
   '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke-linecap="round" aria-hidden="true"><path class="rm-chg-icon-plus" d="M5 1.5v6M2 4.5h6" stroke-width="1.8"/><path class="rm-chg-icon-minus" d="M8.5 11.5h6" stroke-width="1.8"/><path class="rm-chg-icon-slash" d="M12.5 2.5 3.5 13.5" stroke-width="1"/></svg>';
@@ -56,6 +60,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri
     </nav>
     <div id="rm-nav-resizer" role="separator" aria-orientation="vertical" aria-label="Resize quick navigation" aria-valuemin="120" aria-valuemax="600" tabindex="0" title="Drag to resize, double-click to reset"></div>
     <main id="rm-main">
+      <div id="rm-task-progress" role="progressbar" aria-label="Task progress" aria-valuemin="0" hidden><span class="rm-task-progress-done"></span><span class="rm-task-progress-active"></span></div>
       <article id="rm-content" class="rm-markdown"></article>
     </main>
   </div>
@@ -64,6 +69,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri
     <button id="rm-toggle-nav" class="rm-icon-btn" title="Toggle quick navigation" aria-label="Toggle quick navigation">&#x2630;</button>
     <button id="rm-top" class="rm-icon-btn" title="Back to top" aria-label="Back to top">&#x2191;</button>
     <button id="rm-toggle-changes" class="rm-icon-btn" title="Show changes as bars only" aria-label="Show changes as bars only" aria-pressed="true" hidden>${CHANGES_ICON}</button>
+    <button id="rm-follow-tasks" class="rm-icon-btn" title="Stop following steps in progress" aria-label="Follow steps in progress" aria-pressed="true" hidden>${FOLLOW_ICON}</button>
     <button id="rm-open-settings" class="rm-icon-btn" title="Reading settings" aria-label="Reading settings">&#x2699;</button>
   </div>
   <div id="rm-settings" role="dialog" aria-label="Reading settings" hidden></div>

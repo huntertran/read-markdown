@@ -14,6 +14,11 @@ export interface RenderOptions {
    * Return undefined to keep the original value.
    */
   resolveResource?: (path: string) => string | undefined;
+  /**
+   * Render in-progress task items (`- [/] step`) as unchecked items flagged `data-task="active"`.
+   * `false` leaves the marker as plain text, as on GitHub. Default: true.
+   */
+  activeTasks?: boolean;
 }
 
 export interface RenderResult {
@@ -39,6 +44,9 @@ const HAS_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
 const BLOCK_LEAVES = new Set(['fence', 'code_block', 'hr', 'html_block']);
 const ALERT = /^\[!(note|tip|important|warning|caution)\][ \t]*/i;
 const LINE_BREAK = /\r?\n/;
+/** Characters that mark a task list item as in progress: `- [/] step`, `- [~] step`, `- [-] step`. */
+export const ACTIVE_TASK_MARKERS = ['/', '~', '-'] as const;
+const ACTIVE_TASK = /^\[[/~-]\] /;
 
 export function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -52,6 +60,23 @@ export function createMarkdownRenderer(): (source: string, options: RenderOption
   const md = MarkdownIt({ html: true, linkify: true, typographer: false });
   md.use(footnote);
   md.use(taskLists, { enabled: false, label: true });
+
+  // In-progress task items (`- [/] step`, also `[~]` / `[-]`): an agent working through a plan marks
+  // the steps it is on. Rewritten to `[ ] ` so the task-list plugin renders a normal unchecked
+  // checkbox; the item is flagged with `data-task="active"` (the plugin overwrites `class`).
+  md.core.ruler.before('github-task-lists', 'rm_task_active', (state) => {
+    if (getEnv(state.env).options?.activeTasks === false) return;
+    const tokens = state.tokens;
+    for (let i = 2; i < tokens.length; i++) {
+      const inline = tokens[i];
+      if (inline.type !== 'inline' || tokens[i - 1].type !== 'paragraph_open' || tokens[i - 2].type !== 'list_item_open') continue;
+      const first = inline.children?.[0];
+      if (!ACTIVE_TASK.test(inline.content) || first?.type !== 'text' || !ACTIVE_TASK.test(first.content)) continue;
+      inline.content = '[ ]' + inline.content.slice(3);
+      first.content = '[ ]' + first.content.slice(3);
+      tokens[i - 2].attrSet('data-task', 'active');
+    }
+  });
 
   // Source map: annotate every opening block token with its starting source line. Top-level
   // blocks also get their end line (exclusive) so the preview can edit them as raw source; their

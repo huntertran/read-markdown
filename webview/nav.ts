@@ -1,5 +1,6 @@
 // Quick navigation sidebar: heading outline with filter and active-section tracking.
 import type { Heading } from '../src/protocol';
+import type { TaskCounts } from './taskProgress';
 
 let list: HTMLOListElement;
 let empty: HTMLElement;
@@ -60,6 +61,23 @@ export function setHeadings(next: Heading[], maxDepth: number): void {
   activeSlug = '';
   applyFilter();
   updateActive();
+}
+
+/** Done/total task counts beside outline headings, with a pulsing dot while a step is in progress. */
+export function setTaskBadges(counts: ReadonlyMap<string, TaskCounts> | undefined): void {
+  for (const li of items) {
+    li.querySelector(':scope > .rm-nav-tasks')?.remove();
+    const c = counts?.get(li.dataset.slug ?? '');
+    li.classList.toggle('rm-nav-has-tasks', !!c);
+    if (!c) continue;
+    const badge = document.createElement('span');
+    badge.className = 'rm-nav-tasks';
+    badge.classList.toggle('rm-nav-tasks-active', c.active > 0);
+    badge.classList.toggle('rm-nav-tasks-complete', c.done === c.total);
+    badge.textContent = `${c.done}/${c.total}`;
+    badge.title = `${c.done} of ${c.total} tasks done` + (c.active ? `, ${c.active} in progress` : '');
+    li.append(badge);
+  }
 }
 
 function applyFilter(): void {

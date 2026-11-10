@@ -55,7 +55,8 @@ export async function applyBlockEdit(
 
 /**
  * Checks or unchecks the task list item on `line` by rewriting only its `[ ]` / `[x]` state
- * character, if the document is still at `docVersion`.
+ * character, if the document is still at `docVersion`. In-progress items (`[/]`, `[~]`, `[-]`) count
+ * as unchecked: checking one marks it done.
  */
 export async function toggleTask(
   document: vscode.TextDocument,
@@ -69,7 +70,7 @@ export async function toggleTask(
   const column = taskMarkerColumn(document.lineAt(line).text);
   if (column === undefined) return { ok: false, error: 'invalid' };
   const range = new vscode.Range(line, column, line, column + 1);
-  const current = document.getText(range) !== ' ';
+  const current = /[xX]/.test(document.getText(range));
   if (current === checked) return { ok: true };
   return replace(document, range, checked ? 'x' : ' ');
 }
