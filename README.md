@@ -3,6 +3,8 @@
 A reading-focused Markdown preview for VS Code, built for the long documents AI coding agents generate
 (plans, specs, reports).
 
+![Jumping through a long document with the outline, filtering headings and folding sections](docs/images/outline.gif)
+
 ## Features
 
 - **Quick navigation**: a sidebar outline of the document's headings. It has a filter box, highlights the section you are reading, and has buttons to collapse or expand everything. Drag its edge to resize it; the width is saved to `readMarkdown.nav.width` (double-click the edge to reset).
@@ -16,6 +18,8 @@ A reading-focused Markdown preview for VS Code, built for the long documents AI 
 - **Live refresh**: the preview updates as you type, and also when the file changes on disk (e.g. an agent rewrites it).
 - **Edit in the preview** (opt-in, `readMarkdown.edit.enabled`): fix a paragraph, list, table, code block or front matter without leaving the preview. See [Editing in the preview](#editing-in-the-preview).
 - **Track changes against git**: for a git-tracked file, the preview shows what you have not staged yet, like Word's track changes: removed text struck through in red, added text in green, moved blocks double-struck in red where they were and double-underlined in green where they are now, joined by a yellow arrow, with change bars beside the text. See [Changes against git](#changes-against-git).
+
+![Selecting a word in the source highlights it in the preview; scrolling and Find stay in sync](docs/images/sync.gif)
 
 ## Usage
 
@@ -44,6 +48,8 @@ VS Code does not let extensions hide the built-in preview button, so it stays in
 
 Turn on `readMarkdown.edit.enabled` (or **Edit blocks in preview** in the ⚙ panel). Then right-click a block and choose **Edit Block**, or hover it: a small toolbar appears in the left margin, with ✎ to edit the block's Markdown source in place and ⠿ for more block actions (such as **Show source**). On headings it sits to the left of the collapse arrow. The toolbar only appears in edit mode, so reading stays uncluttered.
 
+![Editing a paragraph in place, ticking a task and dragging a list item; the source updates alongside](docs/images/edit.gif)
+
 To also open a block by double-clicking it, turn on `readMarkdown.edit.doubleClick` (**Double-click to edit** in the ⚙ panel). It is off by default because double-clicking normally selects a word.
 
 - `Ctrl+Enter` (`Cmd+Enter` on macOS) or **Save** writes the block back to the document. `Esc` or **Cancel** discards your changes.
@@ -66,6 +72,8 @@ When a file is tracked by git and differs from its staged version (the git index
 
 Staging the file clears the marks; they come back for anything you change afterwards. Files that are untracked, ignored or outside a repository show no marks.
 
+![Edits in the source show up in the preview as track changes against git](docs/images/changes.gif)
+
 The ± button in the preview toolbar switches that preview between inline changes and bars only. `readMarkdown.changes.mode` sets the default: `inline`, `gutter` (bars only) or `off`. Removed text is shown for reference only: it is not part of the document, so it is skipped by search highlighting, the outline and block editing.
 
 Clicking a changed file in the Source Control view still opens VS Code's own text diff, which extensions cannot replace. Open the file from the Explorer (or with **Read Markdown: Open Preview**) to see the changes in the preview.
@@ -77,6 +85,8 @@ VS Code does not expose the Find widget's text to extensions. Read Markdown mirr
 ## Settings
 
 All settings live under `readMarkdown.*`. Search "Read Markdown" in the Settings UI. Highlights:
+
+![The ⚙ quick settings panel: theme, font size, line height and heading style](docs/images/settings.gif)
 
 | Setting | Default | Description |
 | --- | --- | --- |
@@ -115,6 +125,7 @@ npm run watch        # rebuild on change
 npm run check-types
 npm test             # unit tests (mocha) + integration tests (VS Code test host)
 npm run package      # build a .vsix
+npm run demo:gifs    # re-record the README GIFs (needs ffmpeg; drives a real VS Code window)
 ```
 
 Press `F5` to launch an Extension Development Host with `test/fixtures` open.

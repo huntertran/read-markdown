@@ -14,7 +14,10 @@ npm test               # pretest builds + bundles tests into out/, then unit (mo
 npm run test:unit      # mocha on out/test/unit — requires `npm run pretest` first (tests are not run from TS)
 npm run test:integration
 npm run package        # vsce package -> .vsix
+npm run demo:gifs      # re-record docs/images/*.gif (scripts/demo/record.mjs; one scene: `node scripts/demo/record.mjs edit`)
 ```
+
+`scripts/demo/record.mjs` starts the `.vscode-test` VS Code with `--remote-debugging-port` and attaches with `playwright-core` (`_electron.launch` fails: release builds block `--inspect`). It strips `ELECTRON_RUN_AS_NODE` from env (set inside VS Code terminals). Frames come from the CDP screencast, the cursor is a drawn overlay, and ffmpeg encodes the GIF. Scenes use real selectors, so update them when renaming webview classes.
 
 Single test: tests run from bundled JS, so rebuild first (`npm run pretest`), then
 - unit: `npx mocha out/test/unit/renderer.test.js --grep "source lines"`

@@ -24,12 +24,19 @@ export class PreviewManager implements vscode.Disposable {
   /** Git index versions, for showing changes in the preview. */
   readonly baseline = new GitBaseline();
   private readonly ignoreEditorScrollUntil = new WeakMap<vscode.TextEditor, number>();
+  /**
+   * First visible line of each editor at its last visible-range event. Edits that replace several
+   * lines (e.g. moving a list item from the preview) fire the event although the editor did not
+   * scroll; without this check the preview would jump to the editor's top line.
+   */
+  private readonly editorTopLine = new WeakMap<vscode.TextEditor, number>();
   private readonly autoOpened = new Set<string>();
   private active: PreviewPanel | undefined;
   settings: Settings = getSettings();
 
   constructor(readonly extensionUri: vscode.Uri) {
     this.customCss.configure(this.settings.customCssFiles, this.settings.customCssInline);
+    this.seedTopLines(vscode.window.visibleTextEditors);
     this.disposables.push(
       this.customCss,
       this.customCss.onDidChange(() => this.broadcastConfig()),
@@ -48,15 +55,18 @@ export class PreviewManager implements vscode.Disposable {
         for (const p of this.panelsFor(e.textEditor.document.uri)) p.highlightSelection(e.textEditor);
       }),
       vscode.window.onDidChangeTextEditorVisibleRanges((e) => {
-        if (!this.settings.scrollSync) return;
-        if (Date.now() < (this.ignoreEditorScrollUntil.get(e.textEditor) ?? 0)) return;
         const line = e.visibleRanges[0]?.start.line;
         if (line === undefined) return;
+        const previous = this.editorTopLine.get(e.textEditor);
+        this.editorTopLine.set(e.textEditor, line);
+        if (!this.settings.scrollSync || line === previous) return;
+        if (Date.now() < (this.ignoreEditorScrollUntil.get(e.textEditor) ?? 0)) return;
         for (const p of this.panelsFor(e.textEditor.document.uri)) {
           p.ignorePreviewScrollUntil = Date.now() + SCROLL_ECHO_MS;
           p.scrollToLine(line);
         }
       }),
+      vscode.window.onDidChangeVisibleTextEditors((editors) => this.seedTopLines(editors)),
       vscode.window.onDidChangeActiveTextEditor((editor) => this.maybeAutoOpen(editor)),
       vscode.workspace.onDidChangeConfiguration((e) => {
         if (e.affectsConfiguration('readMarkdown')) this.onConfigChanged();
@@ -176,6 +186,14 @@ export class PreviewManager implements vscode.Disposable {
 
   visibleEditorFor(uri: vscode.Uri): vscode.TextEditor | undefined {
     return vscode.window.visibleTextEditors.find((e) => e.document.uri.toString() === uri.toString());
+  }
+
+  /** Records where newly shown editors start, so their first visible-range event is compared too. */
+  private seedTopLines(editors: readonly vscode.TextEditor[]): void {
+    for (const editor of editors) {
+      const line = editor.visibleRanges[0]?.start.line;
+      if (line !== undefined && !this.editorTopLine.has(editor)) this.editorTopLine.set(editor, line);
+    }
   }
 
   revealSourceLine(uri: vscode.Uri, line: number): void {

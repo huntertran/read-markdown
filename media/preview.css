@@ -7,6 +7,51 @@
   --rm-hover-bg: color-mix(in srgb, var(--rm-accent) 12%, transparent);
 }
 
+/* Fixed presets (light, dark, sepia, high contrast) don't follow the VS Code theme, so the VS Code
+   widget colors used below by inputs, menus and buttons are remapped to the preset palette. */
+body:not([data-preset='vscode']) {
+  --vscode-input-background: var(--rm-bg);
+  --vscode-input-foreground: var(--rm-fg);
+  --vscode-input-border: var(--rm-border);
+  --vscode-input-placeholderForeground: var(--rm-muted);
+  --vscode-focusBorder: var(--rm-accent);
+  --vscode-sash-hoverBorder: var(--rm-accent);
+  --vscode-dropdown-background: var(--rm-bg);
+  --vscode-dropdown-foreground: var(--rm-fg);
+  --vscode-dropdown-border: var(--rm-border);
+  --vscode-editorWidget-background: var(--rm-bg);
+  --vscode-editorWidget-foreground: var(--rm-fg);
+  --vscode-editorWidget-border: var(--rm-border);
+  --vscode-menu-background: var(--rm-bg);
+  --vscode-menu-foreground: var(--rm-fg);
+  --vscode-menu-border: var(--rm-border);
+  --vscode-menu-selectionBackground: var(--rm-hover-bg);
+  --vscode-menu-selectionForeground: var(--rm-fg);
+  --vscode-button-background: var(--rm-accent);
+  --vscode-button-foreground: var(--rm-bg);
+  --vscode-button-hoverBackground: color-mix(in srgb, var(--rm-accent) 85%, var(--rm-fg));
+  --vscode-button-secondaryBackground: var(--rm-subtle-bg);
+  --vscode-button-secondaryForeground: var(--rm-fg);
+  --vscode-button-secondaryHoverBackground: var(--rm-hover-bg);
+  --vscode-inputValidation-warningBackground: color-mix(in srgb, #d29922 18%, var(--rm-bg));
+  --vscode-inputValidation-warningForeground: var(--rm-fg);
+  --vscode-inputValidation-warningBorder: #d29922;
+}
+
+/* Native control parts (select popups, scrollbars, caret) follow the effective scheme. */
+body[data-scheme='light'] {
+  color-scheme: light;
+}
+
+body[data-scheme='dark'] {
+  color-scheme: dark;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--vscode-input-placeholderForeground, var(--rm-muted));
+}
+
 html {
   scroll-padding-top: 12px;
 }

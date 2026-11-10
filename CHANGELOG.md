@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.1
+
+- Fixed: moving a list item in the preview could make the preview jump to the line at the top of the
+  source editor. VS Code reports a multi-line edit as a change of the editor's visible range even when it
+  did not scroll, and the preview followed it; it now only follows when the editor's top line changes.
+- Fixed: with a fixed theme preset (light, dark, sepia, high contrast) the outline filter box, quick
+  settings panel, block menu, edit box and buttons kept the VS Code theme's colors; they now use the preset.
+- README: animated demos of the outline, sync, editing, changes and quick settings.
+
 ## 0.4.0
 
 - Track changes against git: a git-tracked file opened in the preview shows how it differs from its staged

@@ -16,3 +16,5 @@ esbuild.mjs
 media/marketplace-icon.svg
 plan/**
 CLAUDE.md
+docs/**
+scripts/**
