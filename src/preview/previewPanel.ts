@@ -22,8 +22,10 @@ export class PreviewPanel implements vscode.Disposable {
   private disposed = false;
   private renderTimer: ReturnType<typeof setTimeout> | undefined;
   private lastRender: RenderResult | undefined;
-  /** The git index version last rendered for change display, keyed by its source text. */
-  private originalRender: { key: string; result: RenderResult } | undefined;
+  /** The git index version last rendered for change display, with the inputs it was rendered from. */
+  private originalRender:
+    | { original: string; mermaid: boolean; activeTasks: boolean | undefined; result: RenderResult }
+    | undefined;
   /** Bumped per render so a slower, older render never overwrites a newer one. */
   private renderSeq = 0;
   private lastHighlightKey = '';
@@ -167,12 +169,23 @@ export class PreviewPanel implements vscode.Disposable {
     const original = await this.manager.baseline.getOriginal(this.document.uri);
     if (original === undefined || eolNormalized(original) === eolNormalized(source)) return undefined;
     // Re-render the original when it or a setting that changes rendering changed.
-    const key = JSON.stringify([original, options.mermaid, options.activeTasks]);
-    if (this.originalRender?.key !== key) {
-      this.originalRender = { key, result: this.manager.render(original, options) };
+    let cached = this.originalRender;
+    if (
+      !cached ||
+      cached.original !== original ||
+      cached.mermaid !== options.mermaid ||
+      cached.activeTasks !== options.activeTasks
+    ) {
+      cached = {
+        original,
+        mermaid: options.mermaid,
+        activeTasks: options.activeTasks,
+        result: this.manager.render(original, options),
+      };
+      this.originalRender = cached;
     }
-    const ops = diffDocument(this.originalRender.result.topBlocks, current.topBlocks);
-    return ops?.length ? { originalHtml: this.originalRender.result.html, ops } : undefined;
+    const ops = diffDocument(cached.result.topBlocks, current.topBlocks);
+    return ops?.length ? { originalHtml: cached.result.html, ops } : undefined;
   }
 
   /** Asks the webview to switch between inline changes and gutter bars. */
