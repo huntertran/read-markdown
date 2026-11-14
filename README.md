@@ -137,6 +137,7 @@ All settings live under `readMarkdown.*`. Search "Read Markdown" in the Settings
 | `edit.enabled`, `edit.doubleClick`, `edit.saveOnCommit` | `false`, `false`, `false` | [Editing in the preview](#editing-in-the-preview) |
 | `changes.mode` | `inline` | `inline`, `gutter`, `off`: [Changes against git](#changes-against-git) |
 | `tasks.agentProgress`, `tasks.progress` | `true`, `true` | In-progress steps, follow and flash; progress bar and outline counts: [Following an agent's plan](#following-an-agents-plan) |
+| `security.allowRemoteContent` | `true` | Load remote `https:` images and media in the preview. Turn off to block them (also from document CSS). Remote stylesheets and fonts are always blocked |
 
 Example:
 
@@ -148,6 +149,8 @@ Example:
 ```
 
 Custom CSS can target `.rm-markdown` (content), `#rm-nav` (outline), `.rm-section`, `.rm-heading`, `pre.rm-code`, `.rm-edit` (the in-place block editor) and the `--rm-*` CSS variables. For changes against git: `ins.rm-ins` / `del.rm-del` (changed words), `.rm-chg-ins`, `.rm-chg-del`, `.rm-chg-mod`, `.rm-chg-move-from`, `.rm-chg-move-to` (blocks), `.rm-chg-bar` (bars), and the colors `--rm-chg-ins-bg`, `--rm-chg-del-bg`, `--rm-chg-del-line`, `--rm-chg-move`, `--rm-chg-move-arrow`, `--rm-chg-added`, `--rm-chg-modified`, `--rm-chg-deleted`. For task progress: `.task-list-item[data-task='active']` (in-progress step; its label's `::after` is the “working” label), `.rm-task-just-done`, `#rm-task-progress` (bar) and `.rm-nav-tasks` (outline counts).
+
+The preview never loads remote stylesheets or fonts, so `@import url(https://…)` and remote `@font-face` sources in custom CSS (or in a document's own `<style>`) have no effect: use fonts installed on your system, or `data:` / workspace files. Remote images and media still load; set `readMarkdown.security.allowRemoteContent` to `false` to block them too, so opening a document cannot reveal your IP address.
 
 ## Development
 

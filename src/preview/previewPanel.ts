@@ -129,7 +129,30 @@ export class PreviewPanel implements vscode.Disposable {
       dark: vscode.Uri.joinPath(ext, 'media', 'icon-dark.svg'),
     };
     this.updateTitle();
-    this.panel.webview.html = getWebviewHtml(this.panel.webview, ext, this.document.uri);
+    this.panel.webview.html = getWebviewHtml(
+      this.panel.webview,
+      ext,
+      this.document.uri,
+      this.manager.settings.allowRemoteContent,
+    );
+  }
+
+  /**
+   * Rebuilds the webview HTML (new nonce, new CSP), which reloads the page: the CSP is fixed at load time. The
+   * reloaded page sends `ready` and the handler below re-sends config and content; its scroll line comes from
+   * `WebviewState` (kept by VS Code across reloads). An open block editor is lost. Nothing is posted until then.
+   */
+  reloadWebview(): void {
+    if (this.disposed) return;
+    this.ready = false;
+    if (this.renderTimer) clearTimeout(this.renderTimer);
+    this.renderTimer = undefined;
+    this.panel.webview.html = getWebviewHtml(
+      this.panel.webview,
+      this.manager.extensionUri,
+      this.document.uri,
+      this.manager.settings.allowRemoteContent,
+    );
   }
 
   private updateTitle(): void {

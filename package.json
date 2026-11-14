@@ -32,12 +32,13 @@
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": "limited",
-      "description": "In untrusted workspaces, workspace settings for custom CSS and in-preview editing are ignored.",
+      "description": "In untrusted workspaces, workspace settings for custom CSS, in-preview editing and remote content are ignored.",
       "restrictedConfigurations": [
         "readMarkdown.customCss.files",
         "readMarkdown.customCss.inline",
         "readMarkdown.edit.enabled",
-        "readMarkdown.edit.saveOnCommit"
+        "readMarkdown.edit.saveOnCommit",
+        "readMarkdown.security.allowRemoteContent"
       ]
     }
   },
@@ -535,6 +536,12 @@
           "default": true,
           "markdownDescription": "Show a progress bar for task lists (done, in progress, open) and done/total counts beside outline headings. Only applies when `#readMarkdown.tasks.agentProgress#` is on.",
           "order": 101
+        },
+        "readMarkdown.security.allowRemoteContent": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Allow the preview to load remote (`https:`) images and media, including ones requested from a document's CSS. When off, only images and media from your workspace, the document's folder and `data:` URIs are shown, so opening a document cannot reveal your IP address or that you opened it. Remote stylesheets and fonts (for example `@import url(https://…)` in a document or in custom CSS) are always blocked. Applies to open previews right away; an unsaved in-preview block edit is discarded when the preview reloads. A workspace cannot change this setting until it is trusted.",
+          "order": 110
         }
       }
     }

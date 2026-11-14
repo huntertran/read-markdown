@@ -30,6 +30,8 @@ export interface Settings extends StyleSettings {
   changesMode: ChangesMode;
   agentProgress: boolean;
   taskProgress: boolean;
+  /** Host-only: it shapes the webview's Content-Security-Policy, so the webview never needs it. */
+  allowRemoteContent: boolean;
 }
 
 export function getSettings(scope?: vscode.ConfigurationScope): Settings {
@@ -76,6 +78,7 @@ export function getSettings(scope?: vscode.ConfigurationScope): Settings {
     changesMode: c.get<ChangesMode>('changes.mode', 'inline'),
     agentProgress: c.get<boolean>('tasks.agentProgress', true),
     taskProgress: c.get<boolean>('tasks.progress', true),
+    allowRemoteContent: c.get<boolean>('security.allowRemoteContent', true),
   };
 }
 

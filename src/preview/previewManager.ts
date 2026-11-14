@@ -176,6 +176,9 @@ export class PreviewManager implements vscode.Disposable {
     const prev = this.settings;
     this.settings = getSettings();
     this.customCss.configure(this.settings.customCssFiles, this.settings.customCssInline);
+    // The CSP is part of the page, so a change needs a new page. It also covers a workspace turning trusted
+    // (the effective value changes). The reload makes each panel send `ready`, which re-sends config and content.
+    if (prev.allowRemoteContent !== this.settings.allowRemoteContent) for (const p of this.panels) p.reloadWebview();
     this.broadcastConfig();
     if (
       prev.mermaid !== this.settings.mermaid ||

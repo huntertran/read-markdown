@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Security: the preview no longer loads remote stylesheets or fonts. A document's `<style>` or `style`
+  attribute, and your own custom CSS (`readMarkdown.customCss.*`), can no longer `@import url(https://…)`
+  or use a remote `@font-face`; such CSS requested the file from the network, which revealed your IP
+  address and that the document was opened. Inline styles and fonts installed on your system still work.
+  If your custom CSS imports a web font, install the font or embed it as a `data:` URI instead.
+- New setting `readMarkdown.security.allowRemoteContent` (default `true`). Turn it off to also block remote
+  images and media in the preview, including ones requested from CSS; images from your workspace and
+  `data:` URIs still show. It applies to open previews immediately (each reloads once) and, like custom
+  CSS, a workspace cannot change it until the workspace is trusted.
 - The quick settings panel is split into icon tabs (Appearance, Layout & navigation, Tables, Diagrams,
   Editing & changes, Task lists), so it is shorter and related settings are together. The preview remembers
   the last tab; arrow keys switch tabs.

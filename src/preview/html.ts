@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import * as vscode from 'vscode';
+import { buildCsp } from './csp';
 
 function escapeAttr(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
@@ -20,19 +21,15 @@ const FOLLOW_ICON =
 const CHANGES_ICON =
   '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke-linecap="round" aria-hidden="true"><path class="rm-chg-icon-plus" d="M5 1.5v6M2 4.5h6" stroke-width="1.8"/><path class="rm-chg-icon-minus" d="M8.5 11.5h6" stroke-width="1.8"/><path class="rm-chg-icon-slash" d="M12.5 2.5 3.5 13.5" stroke-width="1"/></svg>';
 
-export function getWebviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri, documentUri: vscode.Uri): string {
+export function getWebviewHtml(
+  webview: vscode.Webview,
+  extensionUri: vscode.Uri,
+  documentUri: vscode.Uri,
+  allowRemoteContent: boolean,
+): string {
   const nonce = randomBytes(16).toString('base64');
   const media = (...p: string[]) => webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, ...p)).toString();
-  const csp = [
-    `default-src 'none'`,
-    `img-src ${webview.cspSource} https: data: blob:`,
-    `media-src ${webview.cspSource} https: data:`,
-    `style-src ${webview.cspSource} 'unsafe-inline' https:`,
-    `font-src ${webview.cspSource} https: data:`,
-    `script-src 'nonce-${nonce}'`,
-    `form-action 'none'`,
-    `base-uri 'none'`,
-  ].join('; ');
+  const csp = buildCsp({ cspSource: webview.cspSource, nonce, allowRemoteContent });
 
   return /* html */ `<!DOCTYPE html>
 <html lang="en">
