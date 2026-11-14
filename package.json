@@ -29,6 +29,18 @@
     "onLanguage:markdown",
     "onWebviewPanel:readMarkdown.preview"
   ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "In untrusted workspaces, workspace settings for custom CSS and in-preview editing are ignored.",
+      "restrictedConfigurations": [
+        "readMarkdown.customCss.files",
+        "readMarkdown.customCss.inline",
+        "readMarkdown.edit.enabled",
+        "readMarkdown.edit.saveOnCommit"
+      ]
+    }
+  },
   "contributes": {
     "commands": [
       {
