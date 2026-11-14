@@ -8,6 +8,8 @@ import type { RenderOptions, RenderResult } from '../render/markdown';
 import { blockStartFor, countOccurrences, searchTermFromSelection } from '../sync/selection';
 import { getWebviewHtml } from './html';
 import { describeMessage, parseFromWebview } from './messages';
+import { allowedRoots, resolveReference } from './paths';
+import { pathContextFor, toUri } from './pathContext';
 import type { PreviewManager } from './previewManager';
 
 export const PREVIEW_VIEW_TYPE = 'readMarkdown.preview';
@@ -121,8 +123,7 @@ export class PreviewPanel implements vscode.Disposable {
   private configureWebview(): void {
     const ext = this.manager.extensionUri;
     const roots = [vscode.Uri.joinPath(ext, 'media'), vscode.Uri.joinPath(ext, 'dist', 'media')];
-    if (this.document.uri.scheme === 'file') roots.push(vscode.Uri.file(path.dirname(this.document.uri.fsPath)));
-    for (const f of vscode.workspace.workspaceFolders ?? []) roots.push(f.uri);
+    roots.push(...allowedRoots(pathContextFor(this.document.uri)).map(toUri));
     this.panel.webview.options = { enableScripts: true, localResourceRoots: roots };
     this.panel.iconPath = {
       light: vscode.Uri.joinPath(ext, 'media', 'icon-light.svg'),
@@ -287,24 +288,10 @@ export class PreviewPanel implements vscode.Disposable {
   }
 
   private resolveResource(p: string): string | undefined {
-    const [pathPart] = p.split(/[?#]/);
-    let decoded: string;
-    try {
-      decoded = decodeURIComponent(pathPart);
-    } catch {
-      decoded = pathPart;
-    }
-    let uri: vscode.Uri | undefined;
-    if (decoded.startsWith('/')) {
-      const folder = vscode.workspace.getWorkspaceFolder(this.document.uri) ?? vscode.workspace.workspaceFolders?.[0];
-      uri = folder ? vscode.Uri.joinPath(folder.uri, decoded) : vscode.Uri.file(decoded);
-    } else if (this.document.uri.scheme === 'file') {
-      uri = vscode.Uri.file(path.resolve(path.dirname(this.document.uri.fsPath), decoded));
-    } else {
-      const folder = vscode.workspace.workspaceFolders?.[0];
-      uri = folder ? vscode.Uri.joinPath(folder.uri, decoded) : undefined;
-    }
-    return uri ? this.panel.webview.asWebviewUri(uri).toString() : undefined;
+    // Relative to the first workspace folder for documents that are not local files: how images always resolved.
+    const ref = resolveReference(p, pathContextFor(this.document.uri, 'workspace'));
+    // A target outside `localResourceRoots` still gets a URI; the webview just fails to load it.
+    return ref.kind === 'local' ? this.panel.webview.asWebviewUri(toUri(ref)).toString() : undefined;
   }
 
   async sendConfig(): Promise<void> {

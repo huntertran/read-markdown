@@ -7,10 +7,11 @@ import type { ToWebview, WebviewState } from '../protocol';
 import { type RenderOptions, type RenderResult, createMarkdownRenderer } from '../render/markdown';
 import { GitBaseline } from '../scm/gitBaseline';
 import { isRestorableScheme, uriScheme } from './messages';
+import { resolveReference } from './paths';
+import { pathContextFor, toUri } from './pathContext';
 import { PREVIEW_VIEW_TYPE, PreviewPanel } from './previewPanel';
 
 const MARKDOWN_EXT = /\.(md|markdown|mdown|mkd|mkdn)$/i;
-const EXTERNAL_SCHEMES = new Set(['http', 'https', 'mailto']);
 const SCROLL_ECHO_MS = 300;
 
 export function isMarkdownDocument(doc: vscode.TextDocument): boolean {
@@ -243,38 +244,25 @@ export class PreviewManager implements vscode.Disposable {
   }
 
   async openLink(from: vscode.Uri, href: string): Promise<void> {
-    if (!href) return;
-    const schemeMatch = /^([a-z][a-z0-9+.-]*):/i.exec(href);
-    if (schemeMatch) {
-      const scheme = schemeMatch[1].toLowerCase();
-      if (EXTERNAL_SCHEMES.has(scheme)) await vscode.env.openExternal(vscode.Uri.parse(href, true));
-      else if (scheme === 'file') await this.openLocal(vscode.Uri.parse(href, true));
-      // Other schemes (command:, vscode:, javascript:...) are ignored on purpose.
-      return;
+    const ref = resolveReference(href, pathContextFor(from));
+    switch (ref.kind) {
+      case 'external':
+        await vscode.env.openExternal(vscode.Uri.parse(href, true));
+        return;
+      case 'fragment':
+        for (const p of this.panelsFor(from)) p.revealHeading(ref.fragment);
+        return;
+      case 'local':
+        // `ref.inside` tells whether the target is in the workspace or the document's folder; not acted on yet.
+        // A `file:` URI keeps its query and fragment in the target (the heading is not revealed).
+        if (ref.via === 'file-uri') await this.openLocal(toUri(ref).with({ query: ref.query, fragment: ref.fragment }));
+        else await this.openLocal(toUri(ref), ref.fragment);
+        return;
+      // Other schemes (command:, vscode:, javascript:...) are ignored on purpose, and so is an empty href.
+      case 'unsupported':
+      case 'invalid':
+        return;
     }
-    const hashIndex = href.indexOf('#');
-    const rawPath = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
-    const fragment = hashIndex >= 0 ? href.slice(hashIndex + 1) : '';
-    if (!rawPath) {
-      for (const p of this.panelsFor(from)) p.revealHeading(fragment);
-      return;
-    }
-    let decoded: string;
-    try {
-      decoded = decodeURIComponent(rawPath.split('?')[0]);
-    } catch {
-      decoded = rawPath;
-    }
-    let target: vscode.Uri;
-    if (decoded.startsWith('/')) {
-      const folder = vscode.workspace.getWorkspaceFolder(from) ?? vscode.workspace.workspaceFolders?.[0];
-      target = folder ? vscode.Uri.joinPath(folder.uri, decoded) : vscode.Uri.file(decoded);
-    } else if (from.scheme === 'file') {
-      target = vscode.Uri.file(path.resolve(path.dirname(from.fsPath), decoded));
-    } else {
-      target = vscode.Uri.joinPath(from, '..', decoded);
-    }
-    await this.openLocal(target, fragment);
   }
 
   private async openLocal(target: vscode.Uri, fragment = ''): Promise<void> {
