@@ -268,7 +268,15 @@ export class PreviewManager implements vscode.Disposable {
     if (MARKDOWN_EXT.test(target.path)) {
       const column = this.active?.panel.viewColumn ?? vscode.ViewColumn.Active;
       const preview = await this.open(target, column, false);
-      if (fragment) preview.revealHeading(decodeURIComponent(fragment));
+      if (fragment) {
+        let heading: string;
+        try {
+          heading = decodeURIComponent(fragment);
+        } catch {
+          heading = fragment;
+        }
+        preview.revealHeading(heading);
+      }
       return;
     }
     await vscode.commands.executeCommand('vscode.open', target);
