@@ -3,8 +3,10 @@ import footnote from 'markdown-it-footnote';
 import taskLists from 'markdown-it-task-lists';
 import hljs from 'highlight.js/lib/common';
 import type { SourceBlock } from '../diff/blockDiff';
+import type { ListRange } from '../edit/rendered';
 import type { Heading } from '../protocol';
 import { Slugger, headingText } from './headings';
+import { neutralizeReservedAttributes } from './rawHtml';
 
 export interface RenderOptions {
   /** Render ```mermaid fences as diagram placeholders. */
@@ -29,6 +31,16 @@ export interface RenderResult {
   blockLines: number[];
   /** Top-level blocks (the elements with `data-line-end`) in document order, with their source text. */
   topBlocks: SourceBlock[];
+  /**
+   * Sorted 0-based start lines of the task list items rendered with a checkbox (the `data-line` of
+   * `li.task-list-item`), in-progress items included. The host only toggles these lines.
+   */
+  taskLines: number[];
+  /**
+   * Every rendered list with at least two items, as the `data-line` of each item and the
+   * `data-item-end` of the last: the host only reorders items of exactly such a list.
+   */
+  lists: ListRange[];
 }
 
 interface RenderEnv {
@@ -37,6 +49,8 @@ interface RenderEnv {
   hasMermaid: boolean;
   blockLines: Set<number>;
   topBlocks: SourceBlock[];
+  taskLines: number[];
+  lists: ListRange[];
 }
 
 const FRONT_MATTER = /^---[ \t]*\r?\n([\s\S]*?)\r?\n(?:---|\.\.\.)[ \t]*(?:\r?\n|$)/;
@@ -84,7 +98,18 @@ export function createMarkdownRenderer(): (source: string, options: RenderOption
   md.core.ruler.push('rm_source_map', (state) => {
     const env = getEnv(state.env);
     let lines: string[] | undefined;
+    // Items of the lists being walked, innermost last (lists nest, items of a list do not interleave).
+    const openLists: number[][] = [];
+    const lastItemEnd: number[] = [];
     for (const token of state.tokens) {
+      if (token.type === 'bullet_list_open' || token.type === 'ordered_list_open') {
+        openLists.push([]);
+        lastItemEnd.push(-1);
+      } else if (token.type === 'bullet_list_close' || token.type === 'ordered_list_close') {
+        const starts = openLists.pop();
+        const end = lastItemEnd.pop();
+        if (starts && starts.length > 1 && end !== undefined) env.lists.push({ starts, end });
+      }
       if (!token.map || !token.block) continue;
       if (token.nesting === 1 || BLOCK_LEAVES.has(token.type)) {
         const line = token.map[0];
@@ -98,7 +123,16 @@ export function createMarkdownRenderer(): (source: string, options: RenderOption
         }
         // List items get their own end line (not `data-line-end`, which marks editable top-level
         // blocks) so the preview can reorder them; it includes nested lists and trailing blanks.
-        else if (token.type === 'list_item_open') token.attrSet('data-item-end', String(token.map[1]));
+        else if (token.type === 'list_item_open') {
+          token.attrSet('data-item-end', String(token.map[1]));
+          if (String(token.attrGet('class')).includes('task-list-item')) env.taskLines.push(line);
+          // Same values as the attributes, so the host can tell a rendered list from a forged one.
+          const items = openLists[openLists.length - 1];
+          if (items) {
+            items.push(line);
+            lastItemEnd[lastItemEnd.length - 1] = token.map[1];
+          }
+        }
         env.blockLines?.add(line);
       }
     }
@@ -179,6 +213,15 @@ export function createMarkdownRenderer(): (source: string, options: RenderOption
     return `<pre class="rm-code"${lineAttrs(token)}><code class="hljs">${escapeHtml(token.content)}</code></pre>\n`;
   };
 
+  // Raw HTML from the document must not carry the attributes the renderer and webview trust (see rawHtml.ts).
+  // The renderer's own markup (line attributes, task checkboxes, alerts, ...) does not use these rules.
+  const defaultHtmlBlock = md.renderer.rules.html_block ?? ((tokens, idx) => tokens[idx].content);
+  md.renderer.rules.html_block = (tokens, idx, options, rawEnv, self) =>
+    neutralizeReservedAttributes(defaultHtmlBlock(tokens, idx, options, rawEnv, self));
+  const defaultHtmlInline = md.renderer.rules.html_inline ?? ((tokens, idx) => tokens[idx].content);
+  md.renderer.rules.html_inline = (tokens, idx, options, rawEnv, self) =>
+    neutralizeReservedAttributes(defaultHtmlInline(tokens, idx, options, rawEnv, self));
+
   const defaultImage = md.renderer.rules.image;
   md.renderer.rules.image = (tokens, idx, options, rawEnv, self) => {
     const env = getEnv(rawEnv);
@@ -195,7 +238,7 @@ export function createMarkdownRenderer(): (source: string, options: RenderOption
   };
 
   return (source: string, options: RenderOptions): RenderResult => {
-    const env: RenderEnv = { options, headings: [], hasMermaid: false, blockLines: new Set(), topBlocks: [] };
+    const env: RenderEnv = { options, headings: [], hasMermaid: false, blockLines: new Set(), topBlocks: [], taskLines: [], lists: [] };
     let prefix = '';
     const fm = FRONT_MATTER.exec(source);
     if (fm) {
@@ -216,6 +259,8 @@ export function createMarkdownRenderer(): (source: string, options: RenderOption
       blockLines: [...env.blockLines].sort((a, b) => a - b),
       // Front matter is pushed after the body blocks; keep document order.
       topBlocks: env.topBlocks.sort((a, b) => a.line - b.line),
+      taskLines: env.taskLines.sort((a, b) => a - b),
+      lists: env.lists,
     };
   };
 }

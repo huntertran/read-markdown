@@ -156,4 +156,97 @@ describe('markdown renderer', () => {
       assert.match(r.html, /\[\/\]/, src);
     }
   });
+
+  describe('rendered ranges for host-side validation', () => {
+    it('collects lists with two or more items, nested lists separately', () => {
+      const r = render('- a\n- b\n  - b1\n  - b2\n  - b3\n- c\n\ntext\n\n- single\n\ntext\n\n1. x\n2. y\n', opts);
+      assert.deepEqual(r.lists, [
+        { starts: [2, 3, 4], end: 5 },
+        { starts: [0, 1, 5], end: 7 },
+        { starts: [13, 14], end: 15 },
+      ]);
+    });
+
+    it('collects ordered lists, lists in blockquotes and loose lists', () => {
+      const r = render('3. a\n4. b\n\n> - q1\n> - q2\n\n- l1\n\n- l2\n\n- l3\n', opts);
+      assert.deepEqual(r.lists, [
+        { starts: [0, 1], end: 3 },
+        { starts: [3, 4], end: 5 },
+        { starts: [6, 8, 10], end: 11 },
+      ]);
+    });
+
+    it('reports the same values as the data-line / data-item-end attributes of the items', () => {
+      const r = render('- a\n- b\n  - c\n  - d\n- e\n', opts);
+      for (const list of r.lists) {
+        for (const s of list.starts) assert.match(r.html, new RegExp(`<li data-line="${s}" data-item-end="\\d+">`));
+        const last = list.starts[list.starts.length - 1];
+        assert.match(r.html, new RegExp(`<li data-line="${last}" data-item-end="${list.end}">`));
+      }
+    });
+
+    it('collects task items, in-progress markers included, but not lookalikes', () => {
+      const r = render('- [ ] a\n- [x] b\n  - [/] c\n  - [~] d\n- [-] e\n- [ ]f\n- plain\n\n1. [ ] n\n', opts);
+      assert.deepEqual(r.taskLines, [0, 1, 2, 3, 4, 8]);
+    });
+
+    it('does not collect in-progress items when activeTasks is off', () => {
+      const r = render('- [ ] a\n- [/] b\n- [x] c\n', { mermaid: true, activeTasks: false });
+      assert.deepEqual(r.taskLines, [0, 2]);
+    });
+
+    it('collects task items in blockquotes and nested lists', () => {
+      const r = render('> - [ ] q\n> - [x] r\n\n- a\n  - [ ] nested\n', opts);
+      assert.deepEqual(r.taskLines, [0, 1, 4]);
+    });
+  });
+
+  describe('raw HTML cannot impersonate renderer output', () => {
+    it('drops line attributes from author HTML and keeps the real ones', () => {
+      const r = render('before\n\n<div data-line="0" data-line-end="999" class="x">forged</div>\n\n- a\n- b\n\nafter\n', opts);
+      assert.doesNotMatch(r.html, /data-line-end="999"/);
+      assert.doesNotMatch(r.html, /<div[^>]*data-line/);
+      assert.match(r.html, /<div class="x">forged<\/div>/);
+      assert.match(r.html, /<p data-line="0" data-line-end="1">before<\/p>/);
+      assert.match(r.html, /<ul data-line="4" data-line-end="7">/);
+      assert.match(r.html, /<li data-line="4" data-item-end="5">/);
+      assert.match(r.html, /<p data-line="7" data-line-end="8">after<\/p>/);
+    });
+
+    it('drops reserved attributes from inline HTML, including data-href', () => {
+      const r = render(
+        'text <span data-line=5 DATA-ITEM-END=6 data-task="active" data-rm-x>s</span> and <a href="https://good.example" data-href="https://evil.example">link</a>\n',
+        opts,
+      );
+      assert.doesNotMatch(r.html, /<span[^>]*data-(line|item-end|task|rm-)/i);
+      assert.doesNotMatch(r.html, /evil\.example/);
+      assert.match(r.html, /<a href="https:\/\/good\.example">link<\/a>/);
+    });
+
+    it('keeps data-href on markdown links and the attributes the renderer writes itself', () => {
+      const r = render('[a](rel.md) ![i](p.png)\n\n- [ ] t\n- [/] u\n\n```mermaid\ngraph TD\n```\n', {
+        mermaid: true,
+        resolveResource: () => 'v://p.png',
+      });
+      assert.match(r.html, /<a href="rel\.md" data-href="rel\.md">/);
+      assert.match(r.html, /<li class="task-list-item" data-line="2" data-item-end="3">/);
+      assert.match(r.html, /<li data-task="active" class="task-list-item" data-line="3" data-item-end="5">/);
+      assert.match(r.html, /<div class="rm-mermaid" data-line="5" data-line-end="8">/);
+      assert.match(r.html, /<img src="v:\/\/p\.png"/);
+    });
+
+    it('keeps front matter, alerts and footnotes working', () => {
+      const r = render('---\na: 1\n---\n> [!NOTE]\n> hi\n\nfoot[^1]\n\n[^1]: note\n', opts);
+      assert.match(r.html, /<details class="rm-frontmatter" data-line="0" data-line-end="3">/);
+      assert.match(r.html, /<blockquote data-line="3" data-line-end="5" class="rm-alert rm-alert-note">/);
+      assert.match(r.html, /rm-alert-title/);
+      assert.match(r.html, /footnote-ref/);
+    });
+
+    it('does not let an unterminated tag swallow the real attributes of the next block', () => {
+      const r = render('<div title="x"\n\ntext\n', opts);
+      assert.match(r.html, /<div title="x"\n>/);
+      assert.match(r.html, /<p data-line="2" data-line-end="3">text<\/p>/);
+    });
+  });
 });
