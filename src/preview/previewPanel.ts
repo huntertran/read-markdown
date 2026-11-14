@@ -6,6 +6,7 @@ import type { DocChanges, FromWebview, ToWebview } from '../protocol';
 import type { RenderOptions, RenderResult } from '../render/markdown';
 import { blockStartFor, countOccurrences, searchTermFromSelection } from '../sync/selection';
 import { getWebviewHtml } from './html';
+import { describeMessage, parseFromWebview } from './messages';
 import type { PreviewManager } from './previewManager';
 
 export const PREVIEW_VIEW_TYPE = 'readMarkdown.preview';
@@ -46,7 +47,7 @@ export class PreviewPanel implements vscode.Disposable {
   ) {
     this.configureWebview();
     this.disposables.push(
-      panel.webview.onDidReceiveMessage((m: FromWebview) => this.onMessage(m)),
+      panel.webview.onDidReceiveMessage((data: unknown) => this.receive(data)),
       panel.onDidDispose(() => this.dispose()),
       panel.onDidChangeViewState(({ webviewPanel }) => {
         if (!webviewPanel.visible) this.findMayBeStale = true;
@@ -272,6 +273,21 @@ export class PreviewPanel implements vscode.Disposable {
   }
 
   // ---- messages --------------------------------------------------------------------------
+
+  /** Validates a message from the (untrusted) webview and handles it; failures are logged, never thrown. */
+  private async receive(data: unknown): Promise<void> {
+    const m = parseFromWebview(data);
+    if (!m) {
+      this.manager.log(`Ignored invalid message from the webview (${describeMessage(data)}).`);
+      return;
+    }
+    try {
+      await this.onMessage(m);
+    } catch (e) {
+      // Log the error message only, never the webview's payload.
+      this.manager.log(`Handling "${m.type}" failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
 
   private async onMessage(m: FromWebview): Promise<void> {
     switch (m.type) {

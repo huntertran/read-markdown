@@ -6,6 +6,7 @@ import { buildCssVariables } from '../config/styles';
 import type { ToWebview, WebviewState } from '../protocol';
 import { type RenderOptions, type RenderResult, createMarkdownRenderer } from '../render/markdown';
 import { GitBaseline } from '../scm/gitBaseline';
+import { isRestorableScheme, uriScheme } from './messages';
 import { PREVIEW_VIEW_TYPE, PreviewPanel } from './previewPanel';
 
 const MARKDOWN_EXT = /\.(md|markdown|mdown|mkd|mkdn)$/i;
@@ -19,6 +20,7 @@ export function isMarkdownDocument(doc: vscode.TextDocument): boolean {
 export class PreviewManager implements vscode.Disposable {
   private readonly panels = new Set<PreviewPanel>();
   private readonly disposables: vscode.Disposable[] = [];
+  private readonly output = vscode.window.createOutputChannel('Read Markdown');
   private readonly renderer = createMarkdownRenderer();
   private readonly customCss = new CustomCssProvider();
   /** Git index versions, for showing changes in the preview. */
@@ -38,6 +40,7 @@ export class PreviewManager implements vscode.Disposable {
     this.customCss.configure(this.settings.customCssFiles, this.settings.customCssInline);
     this.seedTopLines(vscode.window.visibleTextEditors);
     this.disposables.push(
+      this.output,
       this.customCss,
       this.customCss.onDidChange(() => this.broadcastConfig()),
       this.baseline,
@@ -72,6 +75,11 @@ export class PreviewManager implements vscode.Disposable {
         if (e.affectsConfiguration('readMarkdown')) this.onConfigChanged();
       }),
     );
+  }
+
+  /** Writes a line to the "Read Markdown" output channel. Never pass document or message contents. */
+  log(message: string): void {
+    this.output.appendLine(`[${new Date().toISOString()}] ${message}`);
   }
 
   // ---- panel registry --------------------------------------------------------------------
@@ -121,7 +129,8 @@ export class PreviewManager implements vscode.Disposable {
   }
 
   async restore(panel: vscode.WebviewPanel, state: WebviewState | undefined): Promise<void> {
-    if (!state?.uri) {
+    // The saved state is untrusted: only open the URI schemes the extension itself previews.
+    if (!state?.uri || !isRestorableScheme(uriScheme(state.uri))) {
       panel.dispose();
       return;
     }
