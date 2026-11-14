@@ -7,6 +7,7 @@ const base: StyleSettings = {
   bodyFontSize: 15,
   bodyLineHeight: 1.65,
   bodyMaxWidth: 860,
+  bodyFullWidth: false,
   bodyBackgroundColor: '',
   bodyTextColor: '',
   headingFontFamily: '',
@@ -47,6 +48,11 @@ describe('buildCssVariables', () => {
     assert.match(css, /--rm-h1-size: 3em;/);
     assert.match(css, /--rm-h2-size: 30px;/);
     assert.match(css, /--rm-h1-color: red;/);
+  });
+
+  it('ignores the max width when filling the screen width', () => {
+    const css = buildCssVariables({ ...base, bodyFullWidth: true });
+    assert.match(css, /--rm-max-width: none;/);
   });
 
   it('clamps numbers and strips CSS injection characters', () => {

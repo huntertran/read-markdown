@@ -260,6 +260,12 @@
           "description": "Maximum content width in pixels. 0 means full width.",
           "order": 24
         },
+        "readMarkdown.body.fullWidth": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Let the content fill the whole preview width, ignoring `#readMarkdown.body.maxWidth#`.",
+          "order": 24
+        },
         "readMarkdown.body.backgroundColor": {
           "type": "string",
           "default": "",
@@ -428,6 +434,35 @@
           "default": true,
           "description": "Render ```mermaid code blocks as diagrams.",
           "order": 61
+        },
+        "readMarkdown.mermaid.theme": {
+          "type": "string",
+          "enum": ["auto", "default", "neo", "redux", "redux-color", "base", "forest", "neutral"],
+          "enumDescriptions": [
+            "Colored like the preview (theme preset, custom colors, VS Code theme), without gradients.",
+            "Mermaid's default theme; its dark theme in a dark preview.",
+            "Mermaid's neo theme; neo-dark in a dark preview.",
+            "Mermaid's redux theme (monochrome); redux-dark in a dark preview.",
+            "Mermaid's redux-color theme; redux-dark-color in a dark preview.",
+            "Mermaid's base theme with its own colors (light only).",
+            "Mermaid's forest theme, greens (light only).",
+            "Mermaid's neutral theme, greys for printing (light only)."
+          ],
+          "default": "auto",
+          "markdownDescription": "Theme of Mermaid diagrams. Themes with a dark variant switch to it when the preview is dark.",
+          "order": 62
+        },
+        "readMarkdown.mermaid.look": {
+          "type": "string",
+          "enum": ["classic", "neo", "handDrawn"],
+          "enumDescriptions": [
+            "Mermaid's classic shapes.",
+            "Mermaid's newer, cleaner shapes (pairs well with the neo and redux themes).",
+            "Sketch-style shapes."
+          ],
+          "default": "classic",
+          "description": "Drawing style of Mermaid diagrams.",
+          "order": 63
         },
         "readMarkdown.sections.collapsible": {
           "type": "boolean",

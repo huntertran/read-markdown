@@ -5,7 +5,8 @@ import { applyChanges } from './changes';
 import { hideBlockActions, initBlockActions, registerBlockAction, setBlockActionsEnabled } from './blockActions';
 import { decorateCodeBlocks, initCodeBlocks } from './codeblocks';
 import { deferRender, editBlockAtLine, initBlockEdit, isEditing, onBlockSource, onEditResult, onTaskResult, setEditable, syncTaskCheckboxes } from './editBlock';
-import { renderMermaid, rerenderMermaid } from './mermaid';
+import { type MermaidOptions, renderMermaid } from './mermaid';
+import { decorateDiagrams, initDiagramZoom } from './mermaidZoom';
 import { cancelListDrag, initListDrag, onMoveResult, setListDragEnabled } from './listDrag';
 import { initNav, setHeadings, setTaskBadges, updateActive } from './nav';
 import { initNavResize, syncNavWidth } from './navResize';
@@ -14,6 +15,7 @@ import { initScrollMap, invalidate, isSuppressed, lineAtTop, scrollProgrammatica
 import { initSearch, reapplySearch, setSearch } from './search';
 import { buildSections, collapsedSlugs, expandTo, setAllCollapsed, setCollapsed } from './sections';
 import { initSettingsPanel, updateSettingsPanel } from './settingsPanel';
+import { applyTableWidths, cancelTableResize, initTableResize } from './tableResize';
 import { initTaskProgress, updateTaskProgress } from './taskProgress';
 
 const content = $('rm-content');
@@ -37,12 +39,40 @@ function updateScheme(): void {
   body.dataset.scheme = next;
   if (next !== scheme) {
     scheme = next;
-    if (rendered && ui?.mermaid) void rerenderMermaid(content, scheme).then(invalidate);
+    syncMermaid();
   }
 }
 
 // VS Code toggles body classes when the color theme changes.
 new MutationObserver(updateScheme).observe(body, { attributes: true, attributeFilter: ['class'] });
+
+// ---- mermaid -----------------------------------------------------------------------------
+
+function mermaidOptions(config: UiConfig): MermaidOptions {
+  return {
+    scheme,
+    theme: config.mermaidTheme,
+    look: config.mermaidLook,
+  };
+}
+
+/** Redraws diagrams whose theme, look or (for the `auto` theme) preview colors changed. */
+function syncMermaid(): void {
+  if (rendered && ui?.mermaid) void renderMermaid(content, mermaidOptions(ui)).then(afterMermaid);
+}
+
+function afterMermaid(): void {
+  decorateDiagrams(content);
+  invalidate();
+}
+
+// VS Code sets its theme colors on <html style>; the `auto` diagram theme is colored from them.
+// Debounced: dragging the outline width also writes there on every pointer move.
+let themeColorTimer: ReturnType<typeof setTimeout> | undefined;
+new MutationObserver(() => {
+  clearTimeout(themeColorTimer);
+  themeColorTimer = setTimeout(syncMermaid, 150);
+}).observe(document.documentElement, { attributes: true, attributeFilter: ['style'] });
 
 // ---- config ------------------------------------------------------------------------------
 
@@ -75,6 +105,8 @@ function applyConfig(msg: Extract<ToWebview, { type: 'config' }>): void {
       prev.taskProgress !== ui.taskProgress ||
       prev.agentProgress !== ui.agentProgress);
   if (needsRerender && lastRender) renderContent(lastRender);
+  // New diagram settings, or new preview colors for the `auto` diagram theme.
+  else syncMermaid();
 }
 
 // ---- render ------------------------------------------------------------------------------
@@ -85,6 +117,7 @@ function renderContent(msg: Extract<ToWebview, { type: 'render' }>): void {
   if (deferRender(msg)) return;
   hideBlockActions();
   cancelListDrag();
+  cancelTableResize();
   lastRender = msg;
   const scrollY = window.scrollY;
   const state = getState();
@@ -102,6 +135,7 @@ function renderContent(msg: Extract<ToWebview, { type: 'render' }>): void {
     collapsed: previous,
   });
   decorateCodeBlocks(content, ui.copyButton);
+  applyTableWidths();
   stampMenuContext();
   syncTaskCheckboxes();
   setHeadings(msg.headings, ui.navMaxDepth);
@@ -119,7 +153,7 @@ function renderContent(msg: Extract<ToWebview, { type: 'render' }>): void {
   reapplySearch(content);
   scheduleChangeGutter();
   // Removed blocks may bring diagrams the current version no longer has.
-  if (ui.mermaid && (msg.hasMermaid || content.querySelector('.rm-mermaid'))) void renderMermaid(content, scheme).then(invalidate);
+  if (ui.mermaid && (msg.hasMermaid || content.querySelector('.rm-mermaid'))) void renderMermaid(content, mermaidOptions(ui)).then(afterMermaid);
 }
 
 // ---- changes vs git index ----------------------------------------------------------------
@@ -298,6 +332,7 @@ initScrollMap(content);
 initChangeGutter(content, $('rm-main'));
 initSearch($('rm-search-badge'));
 initCodeBlocks(content);
+initDiagramZoom(content);
 initBlockActions(content);
 registerBlockAction({
   id: 'source',
@@ -307,6 +342,7 @@ registerBlockAction({
 });
 initBlockEdit({ content, docVersion: () => lastRender?.docVersion, render: renderContent });
 initListDrag({ content, docVersion: () => lastRender?.docVersion, isBusy: isEditing });
+initTableResize(content);
 initSettingsPanel($('rm-settings'), $('rm-open-settings'));
 initTaskProgress({ content, bar: $('rm-task-progress'), followButton: $('rm-follow-tasks') as HTMLButtonElement });
 initNav({

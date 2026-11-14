@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
-import type { ChangesMode, HeadingHighlight, QuickSettingKey, ThemePreset, UiConfig } from '../protocol';
-import { QUICK_SETTING_KEYS } from '../protocol';
+import type { ChangesMode, HeadingHighlight, MermaidLook, MermaidTheme, QuickSettingKey, ThemePreset, UiConfig } from '../protocol';
+import { MERMAID_LOOKS, MERMAID_THEMES, QUICK_SETTING_KEYS } from '../protocol';
 import { type HeadingMap, type StyleSettings, schemeForPreset } from './styles';
 
 export const SECTION = 'readMarkdown';
@@ -21,6 +21,8 @@ export interface Settings extends StyleSettings {
   searchMinLength: number;
   copyButton: boolean;
   mermaid: boolean;
+  mermaidTheme: MermaidTheme;
+  mermaidLook: MermaidLook;
   collapsible: boolean;
   startCollapsedBelowLevel: number;
   editEnabled: boolean;
@@ -46,6 +48,7 @@ export function getSettings(scope?: vscode.ConfigurationScope): Settings {
     bodyFontSize: c.get<number>('body.fontSize', 15),
     bodyLineHeight: c.get<number>('body.lineHeight', 1.65),
     bodyMaxWidth: c.get<number>('body.maxWidth', 860),
+    bodyFullWidth: c.get<boolean>('body.fullWidth', false),
     bodyBackgroundColor: c.get<string>('body.backgroundColor', ''),
     bodyTextColor: c.get<string>('body.textColor', ''),
     headingFontFamily: c.get<string>('headings.fontFamily', ''),
@@ -65,6 +68,8 @@ export function getSettings(scope?: vscode.ConfigurationScope): Settings {
     tableHeaderTextColor: c.get<string>('table.headerTextColor', ''),
     copyButton: c.get<boolean>('code.copyButton', true),
     mermaid: c.get<boolean>('mermaid.enabled', true),
+    mermaidTheme: oneOf(c.get<string>('mermaid.theme'), MERMAID_THEMES, 'auto'),
+    mermaidLook: oneOf(c.get<string>('mermaid.look'), MERMAID_LOOKS, 'classic'),
     collapsible: c.get<boolean>('sections.collapsible', true),
     startCollapsedBelowLevel: c.get<number>('sections.startCollapsedBelowLevel', 0),
     editEnabled: c.get<boolean>('edit.enabled', false),
@@ -74,6 +79,11 @@ export function getSettings(scope?: vscode.ConfigurationScope): Settings {
     agentProgress: c.get<boolean>('tasks.agentProgress', true),
     taskProgress: c.get<boolean>('tasks.progress', true),
   };
+}
+
+/** `value` if it is one of `allowed` (hand-edited settings.json may hold anything), else `fallback`. */
+function oneOf<T extends string>(value: string | undefined, allowed: readonly T[], fallback: T): T {
+  return allowed.includes(value as T) ? (value as T) : fallback;
 }
 
 export function toUiConfig(s: Settings): UiConfig {
@@ -86,12 +96,15 @@ export function toUiConfig(s: Settings): UiConfig {
     headingHighlight: s.headingHighlight,
     copyButton: s.copyButton,
     mermaid: s.mermaid,
+    mermaidTheme: s.mermaidTheme,
+    mermaidLook: s.mermaidLook,
     collapsible: s.collapsible,
     startCollapsedBelowLevel: s.startCollapsedBelowLevel,
     scrollSync: s.scrollSync,
     fontSize: s.bodyFontSize,
     lineHeight: s.bodyLineHeight,
     maxWidth: s.bodyMaxWidth,
+    fullWidth: s.bodyFullWidth,
     headingScale: s.headingScale,
     tableHeaderBackgroundColor: s.tableHeaderBackgroundColor,
     tableHeaderTextColor: s.tableHeaderTextColor,
@@ -115,6 +128,7 @@ export function validateQuickSetting(key: string, value: unknown): unknown {
     typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max ? value : undefined;
   switch (k) {
     case 'nav.show':
+    case 'body.fullWidth':
     case 'edit.enabled':
     case 'edit.doubleClick':
     case 'tasks.agentProgress':
@@ -141,6 +155,10 @@ export function validateQuickSetting(key: string, value: unknown): unknown {
       return typeof value === 'string' && HIGHLIGHTS.includes(value) ? value : undefined;
     case 'changes.mode':
       return typeof value === 'string' && CHANGES_MODES.includes(value) ? value : undefined;
+    case 'mermaid.theme':
+      return typeof value === 'string' && (MERMAID_THEMES as readonly string[]).includes(value) ? value : undefined;
+    case 'mermaid.look':
+      return typeof value === 'string' && (MERMAID_LOOKS as readonly string[]).includes(value) ? value : undefined;
     case 'table.headerBackgroundColor':
     case 'table.headerTextColor':
       // '' resets to the theme default; the color picker only produces #rrggbb.

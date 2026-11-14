@@ -12,6 +12,17 @@ export interface Heading {
 export type ThemePreset = 'vscode' | 'light' | 'dark' | 'sepia' | 'high-contrast';
 export type HeadingHighlight = 'none' | 'underline' | 'background' | 'leftBorder';
 
+/**
+ * Mermaid theme (`readMarkdown.mermaid.theme`). `auto` = Mermaid's `base` theme colored from the
+ * preview's `--rm-*` colors (follows the theme preset, custom colors and the VS Code theme). Paired
+ * themes switch to their dark variant in a dark preview (`default` -> `dark`, `neo` -> `neo-dark`, ...);
+ * `base`, `forest` and `neutral` have none.
+ */
+export const MERMAID_THEMES = ['auto', 'default', 'neo', 'redux', 'redux-color', 'base', 'forest', 'neutral'] as const;
+export type MermaidTheme = (typeof MERMAID_THEMES)[number];
+export const MERMAID_LOOKS = ['classic', 'neo', 'handDrawn'] as const;
+export type MermaidLook = (typeof MERMAID_LOOKS)[number];
+
 export interface UiConfig {
   navShow: boolean;
   navPosition: 'left' | 'right';
@@ -22,6 +33,10 @@ export interface UiConfig {
   headingHighlight: HeadingHighlight;
   copyButton: boolean;
   mermaid: boolean;
+  /** Mermaid theme (`readMarkdown.mermaid.theme`). */
+  mermaidTheme: MermaidTheme;
+  /** Mermaid `look` (`readMarkdown.mermaid.look`). */
+  mermaidLook: MermaidLook;
   collapsible: boolean;
   startCollapsedBelowLevel: number;
   scrollSync: boolean;
@@ -29,6 +44,8 @@ export interface UiConfig {
   fontSize: number;
   lineHeight: number;
   maxWidth: number;
+  /** Content fills the preview width (`readMarkdown.body.fullWidth`). */
+  fullWidth: boolean;
   headingScale: number;
   /** Empty string = theme default. */
   tableHeaderBackgroundColor: string;
@@ -76,6 +93,7 @@ export const QUICK_SETTING_KEYS = [
   'body.fontSize',
   'body.lineHeight',
   'body.maxWidth',
+  'body.fullWidth',
   'headings.scale',
   'headings.highlight',
   'table.headerBackgroundColor',
@@ -83,6 +101,8 @@ export const QUICK_SETTING_KEYS = [
   'edit.enabled',
   'edit.doubleClick',
   'changes.mode',
+  'mermaid.theme',
+  'mermaid.look',
   'tasks.agentProgress',
   'tasks.progress',
 ] as const;
@@ -154,4 +174,15 @@ export interface WebviewState {
   changesMode?: 'inline' | 'gutter';
   /** Scroll to task items as they become in progress (toolbar toggle); undefined = on. */
   followTasks?: boolean;
+  /** Column widths set by dragging table borders (webview/tableResize.ts). */
+  tableWidths?: TableWidths[];
+  /** Selected tab (section id) of the ⚙ quick settings panel (webview/settingsPanel.ts). */
+  settingsTab?: string;
+}
+
+/** Saved column widths (px) of one table; `key` = header text + occurrence, `index` = table position. */
+export interface TableWidths {
+  key: string;
+  index: number;
+  widths: number[];
 }

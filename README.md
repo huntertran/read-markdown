@@ -14,7 +14,8 @@ A reading-focused Markdown preview for VS Code, built for the long documents AI 
 - **Typography and colors**: theme presets (follow VS Code, light, dark, sepia, high contrast), body font, size, line height, content width, background and text colors, plus heading font, size, color and highlight style.
 - **Custom CSS**, inline in settings or from files. Files are watched and reloaded live.
 - **Quick settings panel** (⚙ in the preview) for the most common options. It writes your VS Code settings.
-- **Code highlighting** with a copy button, **Mermaid diagrams**, GitHub alerts (`> [!NOTE]`), task lists, footnotes, front matter.
+- **Resizable table columns**: drag a column border in any row to set its width; a column can be made narrower than its text, which then wraps, and a table wider than the page scrolls sideways. Double-click a border to reset the table. Widths are kept per preview, across edits and reloads, and are not written to the Markdown.
+- **Code highlighting** with a copy button, **Mermaid diagrams** (zoom with the hover toolbar or Ctrl/Cmd+wheel / pinch, drag to pan, `0` resets, ⛶ or `F` for a full-screen view), GitHub alerts (`> [!NOTE]`), task lists, footnotes, front matter.
 - **Live refresh**: the preview updates as you type, and also when the file changes on disk (e.g. an agent rewrites it).
 - **Edit in the preview** (opt-in, `readMarkdown.edit.enabled`): fix a paragraph, list, table, code block or front matter without leaving the preview. See [Editing in the preview](#editing-in-the-preview).
 - **Track changes against git**: for a git-tracked file, the preview shows what you have not staged yet, like Word's track changes: removed text struck through in red, added text in green, moved blocks double-struck in red where they were and double-underlined in green where they are now, joined by a yellow arrow, with change bars beside the text. See [Changes against git](#changes-against-git).
@@ -121,6 +122,7 @@ All settings live under `readMarkdown.*`. Search "Read Markdown" in the Settings
 | `nav.show` / `nav.position` / `nav.maxDepth` / `nav.width` | `true` / `left` / `3` / `260` | Quick navigation |
 | `theme.preset` | `vscode` | `vscode`, `light`, `dark`, `sepia`, `high-contrast` |
 | `body.fontFamily`, `body.fontSize`, `body.lineHeight`, `body.maxWidth` | system, 15, 1.65, 860 | Body text |
+| `body.fullWidth` | `false` | Content fills the preview width, ignoring `body.maxWidth` |
 | `body.backgroundColor`, `body.textColor` | preset | Colors |
 | `headings.fontFamily`, `headings.scale`, `headings.fontSizes`, `headings.colors` | | Headings |
 | `headings.highlight`, `headings.highlightColor` | `underline` | `none`, `underline`, `background`, `leftBorder` |
@@ -130,6 +132,8 @@ All settings live under `readMarkdown.*`. Search "Read Markdown" in the Settings
 | `table.headerBackgroundColor`, `table.headerTextColor` | accent tint, body text | Table header colors |
 | `sections.collapsible`, `sections.startCollapsedBelowLevel` | `true`, `0` | Folding |
 | `code.copyButton`, `mermaid.enabled`, `preview.scrollSync` | `true` | Extras |
+| `mermaid.theme` | `auto` | Diagram theme. `auto` colors diagrams like the preview (preset, custom colors, VS Code theme). Mermaid's `default`, `neo`, `redux`, `redux-color` switch to their dark variant in a dark preview; `base`, `forest`, `neutral` are light only |
+| `mermaid.look` | `classic` | Diagram shapes: `classic`, `neo`, `handDrawn` |
 | `edit.enabled`, `edit.doubleClick`, `edit.saveOnCommit` | `false`, `false`, `false` | [Editing in the preview](#editing-in-the-preview) |
 | `changes.mode` | `inline` | `inline`, `gutter`, `off`: [Changes against git](#changes-against-git) |
 | `tasks.agentProgress`, `tasks.progress` | `true`, `true` | In-progress steps, follow and flash; progress bar and outline counts: [Following an agent's plan](#following-an-agents-plan) |

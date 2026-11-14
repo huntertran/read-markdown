@@ -393,7 +393,73 @@ body.rm-nav-visible[data-nav-position='right'] #rm-settings {
 
 .rm-settings-title {
   font-weight: 600;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
+}
+
+.rm-settings-tabs {
+  display: flex;
+  gap: 2px;
+}
+
+.rm-settings-tab {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  height: 28px;
+  padding: 0;
+  color: var(--vscode-descriptionForeground, var(--rm-muted));
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.rm-settings-tab svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.rm-settings-tab:hover {
+  color: var(--vscode-editorWidget-foreground, var(--rm-fg));
+  background: var(--rm-hover-bg);
+}
+
+.rm-settings-tab[aria-selected='true'] {
+  color: var(--vscode-button-foreground, #fff);
+  background: var(--vscode-button-background, var(--rm-accent));
+}
+
+.rm-settings-tab:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder, var(--rm-accent));
+  outline-offset: 1px;
+}
+
+.rm-settings-tab-name {
+  margin: 8px 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--vscode-descriptionForeground, var(--rm-muted));
+}
+
+/* All tab panels share one cell, so the pane is as tall as the tallest one and doesn't jump. */
+.rm-settings-panels {
+  display: grid;
+}
+
+.rm-settings-panel {
+  grid-area: 1 / 1;
+  visibility: hidden;
+}
+
+.rm-settings-panel-active {
+  visibility: visible;
 }
 
 .rm-settings-row {
@@ -484,7 +550,7 @@ body.rm-nav-visible[data-nav-position='right'] #rm-settings {
 
 .rm-settings-more {
   width: 100%;
-  margin-top: 4px;
+  margin-top: 8px;
   padding: 5px 8px;
   font: inherit;
   color: var(--vscode-button-secondaryForeground, var(--rm-fg));
@@ -923,6 +989,32 @@ pre.rm-code:hover[data-lang]::after {
   background: color-mix(in srgb, var(--rm-fg) 3%, transparent);
 }
 
+/* Column resizing (webview/tableResize.ts): widths sit on an injected colgroup, so cells may wrap
+   anywhere to get narrower than their longest word. */
+.rm-markdown table.rm-table-sized th,
+.rm-markdown table.rm-table-sized td {
+  overflow-wrap: anywhere;
+}
+
+.rm-col-resize-hover,
+.rm-col-resize-hover *,
+body.rm-col-resizing,
+body.rm-col-resizing * {
+  cursor: col-resize !important;
+}
+
+body.rm-col-resizing {
+  user-select: none;
+}
+
+#rm-col-guide {
+  position: fixed;
+  z-index: 20;
+  width: 2px;
+  background: var(--rm-accent);
+  pointer-events: none;
+}
+
 /* Details / front matter */
 .rm-markdown details {
   padding: 0.4em 0.8em;
@@ -1011,6 +1103,7 @@ body[data-scheme='dark'] .rm-alert-caution { --rm-alert: #f85149 !important; }
 
 /* Mermaid */
 .rm-mermaid {
+  position: relative;
   margin: 0 0 1em;
   overflow-x: auto;
 }
@@ -1031,6 +1124,127 @@ body[data-scheme='dark'] .rm-alert-caution { --rm-alert: #f85149 !important; }
 .rm-mermaid-error {
   border-left: 3px solid #cf222e;
   padding-left: 8px;
+}
+
+/* Diagram zoom (webview/mermaidZoom.ts): the SVG is transformed and clipped by its pre. */
+.rm-mermaid pre.mermaid:focus {
+  outline: none;
+}
+
+/* Inset: the wrapper's horizontal scrolling clips anything outside the pre. */
+.rm-mermaid pre.mermaid:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder, var(--rm-accent));
+  outline-offset: -1px;
+}
+
+.rm-mermaid pre.mermaid.rm-zoomed {
+  overflow: hidden;
+  cursor: grab;
+}
+
+.rm-mermaid pre.mermaid.rm-zoomed:not(:focus-visible) {
+  outline: 1px dashed var(--rm-border);
+  outline-offset: -1px;
+}
+
+.rm-mermaid pre.mermaid.rm-panning {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.rm-zoom {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  font-family: var(--rm-ui-font);
+  font-size: 11px;
+  color: var(--rm-fg);
+  background: var(--rm-bg);
+  border: 1px solid var(--rm-border);
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.rm-mermaid:hover > .rm-zoom,
+.rm-mermaid:focus-within > .rm-zoom,
+.rm-mermaid:has(> pre.rm-zoomed) > .rm-zoom {
+  opacity: 1;
+}
+
+.rm-zoom button {
+  min-width: 22px;
+  height: 20px;
+  padding: 0 4px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.rm-zoom button:hover {
+  background: var(--rm-hover-bg);
+}
+
+.rm-zoom-level {
+  min-width: 3.2em;
+  text-align: center;
+  color: var(--rm-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Full-screen diagram view: covers the whole preview (the Fullscreen API is not available in webviews). */
+.rm-diagram-full {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--rm-bg);
+}
+
+.rm-diagram-stage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  cursor: grab;
+  outline: none;
+}
+
+.rm-diagram-stage.rm-panning {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.rm-diagram-stage > svg {
+  flex: none;
+}
+
+.rm-diagram-full > .rm-zoom {
+  top: 10px;
+  right: 10px;
+  opacity: 1;
+  font-size: 12px;
+}
+
+.rm-diagram-hint {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--rm-ui-font);
+  font-size: 11px;
+  color: var(--rm-muted);
+  pointer-events: none;
 }
 
 /* ---- headings --------------------------------------------------------------------- */
@@ -1494,6 +1708,8 @@ body.rm-list-dragging * {
   #rm-settings,
   .rm-fold,
   .rm-copy,
+  .rm-zoom,
+  .rm-diagram-full,
   .rm-block-rail,
   .rm-block-menu,
   .rm-item-grip,

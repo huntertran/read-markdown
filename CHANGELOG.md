@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+- The quick settings panel is split into icon tabs (Appearance, Layout & navigation, Tables, Diagrams,
+  Editing & changes, Task lists), so it is shorter and related settings are together. The preview remembers
+  the last tab; arrow keys switch tabs.
+- Content width can fill the whole preview: “Fill screen width” in the quick settings panel
+  (`readMarkdown.body.fullWidth`). The width slider is disabled while it is on.
+- Resizable table columns: drag a column border in any row of a rendered table; double-click a border
+  to reset the table. Widths are kept per preview (across edits and reloads), not written to the file.
+- Mermaid diagrams now match the preview: by default they take the preview's background, text, accent and
+  border colors (theme preset, custom colors and VS Code theme) and font, without the gradient borders of
+  Mermaid's dark theme. `readMarkdown.mermaid.theme` picks one of Mermaid's own themes instead (`default`,
+  `neo`, `redux` and `redux-color` switch to their dark variant in a dark preview; `base`, `forest` and
+  `neutral` are light only), and `readMarkdown.mermaid.look` switches the shapes to `neo` or `handDrawn`.
+  Both are in the quick settings panel.
+- Zoom and pan Mermaid diagrams: hover a diagram for − / + / reset buttons, or Ctrl/Cmd+wheel (trackpad pinch)
+  to zoom around the pointer; drag to pan while zoomed. With the diagram focused, `+` / `-` zoom, arrow keys
+  pan and `0` resets. The zoom is kept while the document re-renders.
+- Full-screen diagram view: ⛶ in the diagram toolbar (or `F` on a focused diagram) shows the diagram over
+  the whole preview, fitted to the window; the wheel zooms, dragging pans, `0` fits again and `Esc` closes.
+  It follows edits to the diagram while open.
+
 ## 0.5.0
 
 - Follow an AI agent through a plan: task items marked in progress with `- [/]` (also `[~]`, `[-]`) are

@@ -9,6 +9,8 @@ export interface StyleSettings {
   bodyFontSize: number;
   bodyLineHeight: number;
   bodyMaxWidth: number;
+  /** Content fills the preview width; `bodyMaxWidth` is ignored. */
+  bodyFullWidth: boolean;
   bodyBackgroundColor: string;
   bodyTextColor: string;
   headingFontFamily: string;
@@ -150,7 +152,7 @@ export function buildCssVariables(s: StyleSettings): string {
     '--rm-font': cssValue(s.bodyFontFamily) || SYSTEM_FONT,
     '--rm-font-size': `${num(s.bodyFontSize, 15, 8, 40)}px`,
     '--rm-line-height': String(num(s.bodyLineHeight, 1.65, 1, 3)),
-    '--rm-max-width': s.bodyMaxWidth > 0 ? `${Math.round(s.bodyMaxWidth)}px` : 'none',
+    '--rm-max-width': !s.bodyFullWidth && s.bodyMaxWidth > 0 ? `${Math.round(s.bodyMaxWidth)}px` : 'none',
     '--rm-heading-font': cssValue(s.headingFontFamily) || 'var(--rm-font)',
     '--rm-heading-hl': cssValue(s.headingHighlightColor) || p.accent,
     '--rm-search-bg': cssValue(s.searchHighlightColor) || p.search,
