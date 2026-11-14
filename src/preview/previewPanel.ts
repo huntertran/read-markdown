@@ -174,7 +174,8 @@ export class PreviewPanel implements vscode.Disposable {
     this.renderPending = false;
     const seq = ++this.renderSeq;
     const doc = await this.liveDocument();
-    if (!doc) return;
+    // Disposed meanwhile: asking for the baseline now would re-create the entry the manager just released.
+    if (!doc || this.disposed) return;
     const source = doc.getText();
     const options: RenderOptions = {
       mermaid: this.manager.settings.mermaid,

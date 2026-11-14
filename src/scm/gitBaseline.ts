@@ -17,6 +17,7 @@ interface GitApi {
   readonly state: ApiState;
   readonly onDidChangeState: vscode.Event<ApiState>;
   readonly onDidOpenRepository: vscode.Event<GitRepository>;
+  readonly onDidCloseRepository: vscode.Event<GitRepository>;
   getRepository(uri: vscode.Uri): GitRepository | null;
 }
 
@@ -38,7 +39,10 @@ export class GitBaseline implements vscode.Disposable {
   /** Fires with the file whose baseline changed, or undefined when any may have (git became available). */
   readonly onDidChange = this.emitter.event;
   private readonly entries = new Map<string, Entry>();
-  private readonly watched = new Set<GitRepository>();
+  /** Repository state listeners; disposed when the repository closes or the Git API is replaced. */
+  private readonly watched = new Map<GitRepository, vscode.Disposable>();
+  /** Listeners on the current Git API; disposed before listening again (Git disabled / re-enabled). */
+  private apiListeners: vscode.Disposable[] = [];
   private api: GitApi | undefined;
   private connecting = false;
 
@@ -62,6 +66,11 @@ export class GitBaseline implements vscode.Disposable {
     return entry.text;
   }
 
+  /** Forgets the file's baseline (its last preview closed); a later `getOriginal` fetches it afresh. */
+  release(uri: vscode.Uri): void {
+    this.entries.delete(uri.toString());
+  }
+
   /** The Git API once it is initialized; starts connecting (without waiting) otherwise. */
   private connect(): GitApi | undefined {
     if (this.api?.state === 'initialized') return this.api;
@@ -80,6 +89,7 @@ export class GitBaseline implements vscode.Disposable {
       this.disposables.push(
         git.onDidChangeEnablement((enabled) => {
           this.api = undefined;
+          this.stopListening();
           if (enabled) {
             const api = git.getAPI(1);
             this.api = api;
@@ -99,13 +109,26 @@ export class GitBaseline implements vscode.Disposable {
   }
 
   private listen(api: GitApi): void {
-    this.disposables.push(
+    this.stopListening();
+    this.apiListeners.push(
       api.onDidChangeState((state) => {
         if (state === 'initialized') this.reset();
       }),
       // Repositories are discovered after the API initializes; files in them may now have a baseline.
       api.onDidOpenRepository(() => this.reset()),
+      api.onDidCloseRepository((repo) => {
+        this.watched.get(repo)?.dispose();
+        this.watched.delete(repo);
+        this.reset();
+      }),
     );
+  }
+
+  private stopListening(): void {
+    this.apiListeners.forEach((d) => d.dispose());
+    this.apiListeners = [];
+    this.watched.forEach((d) => d.dispose());
+    this.watched.clear();
   }
 
   private reset(): void {
@@ -115,10 +138,9 @@ export class GitBaseline implements vscode.Disposable {
 
   private watch(repo: GitRepository): void {
     if (this.watched.has(repo)) return;
-    this.watched.add(repo);
     // Fires on stage / unstage / commit / checkout, but also on every status refresh (e.g. a save):
     // only report files whose index content really changed.
-    this.disposables.push(repo.state.onDidChange(() => void this.refresh(repo)));
+    this.watched.set(repo, repo.state.onDidChange(() => void this.refresh(repo)));
   }
 
   private async refresh(repo: GitRepository): Promise<void> {
@@ -136,6 +158,7 @@ export class GitBaseline implements vscode.Disposable {
   dispose(): void {
     this.emitter.dispose();
     this.disposables.forEach((d) => d.dispose());
+    this.stopListening();
     this.entries.clear();
   }
 }

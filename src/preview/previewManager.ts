@@ -92,6 +92,8 @@ export class PreviewManager implements vscode.Disposable {
     this.panels.add(panel);
     panel.onDidDispose(() => {
       this.panels.delete(panel);
+      // No other panel (side preview / custom editor) shows the document: stop refreshing its baseline.
+      if (this.panelsFor(panel.uri).length === 0) this.baseline.release(panel.uri);
       if (this.active === panel) this.active = undefined;
     });
     if (panel.panel.active) this.active = panel;
