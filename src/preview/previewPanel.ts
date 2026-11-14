@@ -27,6 +27,23 @@ export class PreviewPanel implements vscode.Disposable {
   private originalRender:
     | { original: string; mermaid: boolean; activeTasks: boolean | undefined; result: RenderResult }
     | undefined;
+  /**
+   * Inputs of the last render posted to the webview. An identical render would replace the DOM with the same
+   * content (a save fires the text change, the file watcher and a git state change), so it is skipped.
+   * Cleared whenever the webview needs a post regardless (it has no content, or an edit awaits its re-render).
+   */
+  private posted:
+    | {
+        source: string;
+        original: string | undefined;
+        /** Part of the message: the webview sends it back with edits, which are rejected when stale. */
+        docVersion: number;
+        mermaid: boolean;
+        activeTasks: boolean;
+        /** The webview does not re-render when this setting alone changes; it relies on the extension's post. */
+        changesMode: string;
+      }
+    | undefined;
   /** Bumped per render so a slower, older render never overwrites a newer one. */
   private renderSeq = 0;
   private lastHighlightKey = '';
@@ -176,30 +193,42 @@ export class PreviewPanel implements vscode.Disposable {
     const doc = await this.liveDocument();
     // Disposed meanwhile: asking for the baseline now would re-create the entry the manager just released.
     if (!doc || this.disposed) return;
+    // Text and version are read together, before any further await, so the posted version matches the text.
     const source = doc.getText();
-    const options: RenderOptions = {
-      mermaid: this.manager.settings.mermaid,
-      activeTasks: this.manager.settings.agentProgress,
-      resolveResource: (p) => this.resolveResource(p),
-    };
-    const result = this.manager.render(source, options);
-    const changes = await this.changesFor(source, result, options);
+    const docVersion = doc.version;
+    const { mermaid, agentProgress: activeTasks, changesMode } = this.manager.settings;
+    // Fetched before rendering so an identical render is skipped without the Markdown and diff work.
+    const original = changesMode === 'off' ? undefined : await this.manager.baseline.getOriginal(this.document.uri);
     if (seq !== this.renderSeq || this.disposed) return;
+    const last = this.posted;
+    if (
+      last &&
+      last.source === source &&
+      last.original === original &&
+      last.docVersion === docVersion &&
+      last.mermaid === mermaid &&
+      last.activeTasks === activeTasks &&
+      last.changesMode === changesMode
+    ) {
+      return;
+    }
+    const options: RenderOptions = { mermaid, activeTasks, resolveResource: (p) => this.resolveResource(p) };
+    const result = this.manager.render(source, options);
+    const changes = this.changesFor(source, original, result, options);
     this.lastRender = result;
+    this.posted = { source, original, docVersion, mermaid, activeTasks, changesMode };
     this.post({
       type: 'render',
       html: result.html,
       headings: result.headings,
       hasMermaid: result.hasMermaid,
-      docVersion: doc.version,
+      docVersion,
       changes,
     });
   }
 
-  /** Changes of `source` against the file's git index version, if any and if they are shown. */
-  private async changesFor(source: string, current: RenderResult, options: RenderOptions): Promise<DocChanges | undefined> {
-    if (this.manager.settings.changesMode === 'off') return undefined;
-    const original = await this.manager.baseline.getOriginal(this.document.uri);
+  /** Changes of `source` against the file's git index version `original` (undefined: none, or not shown). */
+  private changesFor(source: string, original: string | undefined, current: RenderResult, options: RenderOptions): DocChanges | undefined {
     if (original === undefined || eolNormalized(original) === eolNormalized(source)) return undefined;
     // Re-render the original when it or a setting that changes rendering changed.
     let cached = this.originalRender;
@@ -328,6 +357,8 @@ export class PreviewPanel implements vscode.Disposable {
       case 'ready': {
         this.ready = true;
         this.lastHighlightKey = '';
+        // A (re)loaded webview has no content, whatever was posted to its predecessor.
+        this.posted = undefined;
         await this.sendConfig();
         // Render even if hidden (e.g. restored in a background tab): this is the webview's first content, and it
         // keeps `lastRender` fresh for the scroll/highlight messages below.
@@ -410,7 +441,10 @@ export class PreviewPanel implements vscode.Disposable {
   }
 
   private async afterEdit(doc: vscode.TextDocument): Promise<void> {
-    // Render right away instead of waiting for the change listener's debounce.
+    // Render right away instead of waiting for the change listener's debounce. Always post: the webview reorders
+    // or toggles its DOM optimistically and relies on this render (before the result message) to settle it,
+    // even if the edit left the text unchanged.
+    this.posted = undefined;
     await this.render();
     if (doc.isDirty && !doc.isUntitled && (this.manager.settings.editSaveOnCommit || !this.isOpenInTextEditor())) {
       // A document not shown in any text editor would otherwise hold an unsaved edit nobody sees.
