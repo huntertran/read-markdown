@@ -8,7 +8,6 @@ export const SECTION = 'readMarkdown';
 export type AutoOpen = 'off' | 'beside' | 'active';
 
 export interface Settings extends StyleSettings {
-  replaceDefault: boolean;
   autoOpen: AutoOpen;
   scrollSync: boolean;
   navShow: boolean;
@@ -36,7 +35,6 @@ export interface Settings extends StyleSettings {
 export function getSettings(scope?: vscode.ConfigurationScope): Settings {
   const c = vscode.workspace.getConfiguration(SECTION, scope);
   return {
-    replaceDefault: c.get<boolean>('preview.replaceDefault', false),
     autoOpen: c.get<AutoOpen>('preview.autoOpen', 'off'),
     scrollSync: c.get<boolean>('preview.scrollSync', true),
     navShow: c.get<boolean>('nav.show', true),
