@@ -9,9 +9,10 @@ VS Code extension ("Read Markdown", id `huntertran.read-markdown`): a reading-fo
 ```bash
 npm run build          # esbuild: dist/extension.js + dist/media/main.js, copies mermaid.min.js to dist/media
 npm run watch          # rebuild on change
-npm run check-types    # tsc for BOTH projects: root tsconfig (src, test) and webview/tsconfig.json
+npm run check-types    # tsc for ALL projects: root tsconfig (src, test), webview/tsconfig.json, test/webview/tsconfig.json
+npm run lint           # eslint (flat config, type-aware via projectService); no-floating-promises/no-misused-promises are errors
 npm test               # pretest builds + bundles tests into out/, then unit (mocha) + integration (VS Code host)
-npm run test:unit      # mocha on out/test/unit — requires `npm run pretest` first (tests are not run from TS)
+npm run test:unit      # mocha on out/test/unit + out/test/webview — requires `npm run pretest` first (tests are not run from TS)
 npm run test:integration
 npm run package        # vsce package -> .vsix
 npm run demo:gifs      # re-record docs/images/*.gif (scripts/demo/record.mjs; one scene: `node scripts/demo/record.mjs edit`)
@@ -22,6 +23,10 @@ npm run demo:gifs      # re-record docs/images/*.gif (scripts/demo/record.mjs; o
 Single test: tests run from bundled JS, so rebuild first (`npm run pretest`), then
 - unit: `npx mocha out/test/unit/renderer.test.js --grep "source lines"`
 - integration: `npx vscode-test --grep "<pattern>"` (opens `test/fixtures` as workspace, see `.vscode-test.mjs`)
+
+Webview modules are tested in Node on a happy-dom window: `test/webview/*.test.ts` (own tsconfig with the DOM lib, excluded from the root tsconfig). Each file calls `useDom()` from `test/webview/dom.ts` in its top `describe`; it installs and removes the DOM globals, so host tests stay DOM-free. A module that imports `webview/api.ts` needs an `acquireVsCodeApi` stub first; keep import-time DOM work out of modules that tests load.
+
+`typescript` in `package.json` is an npm alias of `@typescript/typescript6`, because typescript-eslint cannot load the TS 7 native package. `tsc` is TS 7 through the `@typescript/native` alias; `tsc6` is TS 6. Drop the alias once typescript-eslint supports TS 7. CI (`.github/workflows/ci.yml`) runs check-types, lint, tests under xvfb and `npm audit --omit=dev`.
 
 Esbuild does no type checking — always run `npm run check-types`. `F5` launches an Extension Development Host on `test/fixtures` (good long sample: `test/fixtures/long-ai-doc.md`).
 
