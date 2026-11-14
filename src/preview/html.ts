@@ -44,7 +44,7 @@ export function getWebviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri
   <style id="rm-vars"></style>
   <style id="rm-custom"></style>
 </head>
-<body data-uri="${escapeAttr(documentUri.toString())}" data-mermaid-src="${escapeAttr(media('dist', 'media', 'mermaid.min.js'))}" data-nonce="${nonce}">
+<body data-uri="${escapeAttr(documentUri.toString())}" data-mermaid-src="${escapeAttr(media('dist', 'media', 'mermaid.min.js'))}">
   <div id="rm-app">
     <nav id="rm-nav" aria-label="Document outline">
       <div class="rm-nav-header">

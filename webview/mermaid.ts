@@ -21,6 +21,11 @@ export interface MermaidOptions {
   look: MermaidLook;
 }
 
+// `document.currentScript` is only set during initial script execution (the Mermaid loader runs
+// later, lazily), so capture the nonce now. The `nonce` IDL property is hidden from CSS attribute
+// selectors, unlike a data attribute that document-authored CSS could read.
+const SCRIPT_NONCE = (document.currentScript as HTMLScriptElement | null)?.nonce ?? '';
+
 let loading: Promise<MermaidApi> | undefined;
 /** Key of the config Mermaid was last initialized with. */
 let initializedKey = '';
@@ -30,7 +35,7 @@ function load(): Promise<MermaidApi> {
   loading ??= new Promise<MermaidApi>((resolve, reject) => {
     const script = document.createElement('script');
     script.src = document.body.dataset.mermaidSrc ?? '';
-    script.nonce = document.body.dataset.nonce ?? '';
+    script.nonce = SCRIPT_NONCE;
     script.onload = () => (window.mermaid ? resolve(window.mermaid) : reject(new Error('Mermaid failed to load')));
     script.onerror = () => reject(new Error('Mermaid failed to load'));
     document.head.append(script);
