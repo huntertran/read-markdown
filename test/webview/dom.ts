@@ -1,8 +1,8 @@
-// Installs a happy-dom window as the global DOM for one test file, so webview modules (browser
+// Installs a jsdom window as the global DOM for one test file, so webview modules (browser
 // code) can run under mocha in Node. Host-side tests never see these globals: they are added in
 // `before` and removed in `after`. Usage inside a test file:
 //   describe('x', () => { useDom(); it(...) })
-import { Window } from 'happy-dom';
+import { JSDOM } from 'jsdom';
 
 /** DOM globals the webview modules touch. */
 const GLOBALS = [
@@ -20,11 +20,12 @@ const GLOBALS = [
 ] as const;
 
 export function useDom(): void {
-  let win: Window | undefined;
+  let dom: JSDOM | undefined;
   const saved = new Map<string, PropertyDescriptor | undefined>();
 
   before(() => {
-    win = new Window();
+    dom = new JSDOM('<!doctype html><html><head></head><body></body></html>');
+    const win = dom.window;
     const source = win as unknown as Record<string, unknown>;
     for (const name of GLOBALS) {
       saved.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
@@ -33,7 +34,7 @@ export function useDom(): void {
   });
 
   beforeEach(() => {
-    win?.document.body.replaceChildren();
+    dom?.window.document.body.replaceChildren();
   });
 
   after(() => {
@@ -42,7 +43,7 @@ export function useDom(): void {
       else delete (globalThis as Record<string, unknown>)[name];
     }
     saved.clear();
-    void win?.happyDOM.close();
-    win = undefined;
+    dom?.window.close();
+    dom = undefined;
   });
 }
