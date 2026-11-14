@@ -31,6 +31,8 @@ export class PreviewPanel implements vscode.Disposable {
   private renderSeq = 0;
   private lastHighlightKey = '';
   private pendingLine: number | undefined;
+  /** A render was requested while the panel was hidden; it runs once when the panel is shown again. */
+  private renderPending = false;
   /** Set while hidden; VS Code may wrongly re-show a closed find widget when the panel returns. */
   private findMayBeStale = false;
   /** Ignore webview-originated scroll messages until this time (ms) to avoid feedback loops. */
@@ -51,6 +53,7 @@ export class PreviewPanel implements vscode.Disposable {
       panel.onDidDispose(() => this.dispose()),
       panel.onDidChangeViewState(({ webviewPanel }) => {
         if (!webviewPanel.visible) this.findMayBeStale = true;
+        else if (this.renderPending) void this.renderOnShow();
         if (webviewPanel.active) {
           manager.setActive(this);
           if (this.findMayBeStale) {
@@ -117,10 +120,37 @@ export class PreviewPanel implements vscode.Disposable {
 
   scheduleRender(): void {
     if (this.renderTimer) clearTimeout(this.renderTimer);
+    this.renderTimer = undefined;
+    // The panel keeps its context while hidden, so skip the pipeline and catch up once when it is shown.
+    if (!this.panel.visible) {
+      this.renderPending = true;
+      return;
+    }
     this.renderTimer = setTimeout(() => {
       this.renderTimer = undefined;
       void this.render();
     }, RENDER_DEBOUNCE_MS);
+  }
+
+  /** Renders now, or, while the panel is hidden, defers to the next time it is shown. */
+  async render(): Promise<void> {
+    if (!this.ready || this.disposed) return;
+    if (!this.panel.visible) {
+      if (this.renderTimer) clearTimeout(this.renderTimer);
+      this.renderTimer = undefined;
+      this.renderPending = true;
+      return;
+    }
+    await this.renderNow();
+  }
+
+  /** The deferred render, then the search highlight, whose block line may have changed meanwhile. */
+  private async renderOnShow(): Promise<void> {
+    await this.render();
+    const editor = this.manager.visibleEditorFor(this.document.uri);
+    if (this.renderPending || !editor || !this.manager.settings.searchSyncSelection) return;
+    this.lastHighlightKey = '';
+    this.highlightSelection(editor);
   }
 
   /** The bound document, reopened if VS Code closed it (e.g. no editor shows it any more). */
@@ -135,12 +165,13 @@ export class PreviewPanel implements vscode.Disposable {
     return this.document;
   }
 
-  async render(): Promise<void> {
+  private async renderNow(): Promise<void> {
     if (!this.ready || this.disposed) return;
     if (this.renderTimer) {
       clearTimeout(this.renderTimer);
       this.renderTimer = undefined;
     }
+    this.renderPending = false;
     const seq = ++this.renderSeq;
     const doc = await this.liveDocument();
     if (!doc) return;
@@ -231,6 +262,8 @@ export class PreviewPanel implements vscode.Disposable {
   }
 
   highlightSelection(editor: vscode.TextEditor): void {
+    // `blockLines` is stale while a render is deferred; `renderOnShow` sends the highlight after the fresh render.
+    if (this.renderPending) return;
     const s = this.manager.settings;
     const sel = editor.selection;
     let message: ToWebview = { type: 'highlight', term: '', caseSensitive: s.searchCaseSensitive, blockLine: 0, occurrence: 0 };
@@ -295,7 +328,9 @@ export class PreviewPanel implements vscode.Disposable {
         this.ready = true;
         this.lastHighlightKey = '';
         await this.sendConfig();
-        await this.render();
+        // Render even if hidden (e.g. restored in a background tab): this is the webview's first content, and it
+        // keeps `lastRender` fresh for the scroll/highlight messages below.
+        await this.renderNow();
         const editor = this.manager.visibleEditorFor(this.document.uri);
         if (this.pendingLine !== undefined) {
           this.post({ type: 'scrollToLine', line: this.pendingLine });
