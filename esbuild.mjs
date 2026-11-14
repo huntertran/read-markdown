@@ -44,9 +44,12 @@ async function listTests(dir) {
 async function main() {
   if (tests) {
     const unit = await listTests('test/unit');
+    const webview = await listTests('test/webview');
     const integration = await listTests('test/integration');
     await Promise.all([
       esbuild.build({ ...common, entryPoints: unit, outdir: 'out/test/unit', platform: 'node', format: 'cjs', packages: 'external', sourcemap: true }),
+      // Webview modules are browser code, but under test they run in Node on a happy-dom window.
+      esbuild.build({ ...common, entryPoints: webview, outdir: 'out/test/webview', platform: 'node', format: 'cjs', packages: 'external', sourcemap: true }),
       esbuild.build({ ...common, entryPoints: integration, outdir: 'out/test/integration', platform: 'node', format: 'cjs', packages: 'external', external: ['vscode'], sourcemap: true }),
     ]);
     return;

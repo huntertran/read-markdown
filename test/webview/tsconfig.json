@@ -1,0 +1,7 @@
+{
+  "extends": "../../webview/tsconfig.json",
+  "compilerOptions": {
+    "types": ["node", "mocha"]
+  },
+  "include": ["./**/*.ts", "../../types/**/*.d.ts"]
+}

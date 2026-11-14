@@ -543,10 +543,10 @@
     "vscode:prepublish": "npm run check-types && node esbuild.mjs --production",
     "build": "node esbuild.mjs",
     "watch": "node esbuild.mjs --watch",
-    "check-types": "tsc --noEmit -p . && tsc --noEmit -p webview",
+    "check-types": "tsc --noEmit -p . && tsc --noEmit -p webview && tsc --noEmit -p test/webview",
     "pretest": "npm run build && node esbuild.mjs --tests",
     "test": "npm run test:unit && npm run test:integration",
-    "test:unit": "mocha \"out/test/unit/**/*.test.js\"",
+    "test:unit": "mocha \"out/test/unit/**/*.test.js\" \"out/test/webview/**/*.test.js\"",
     "test:integration": "vscode-test",
     "package": "vsce package",
     "demo:gifs": "npm run build && node scripts/demo/record.mjs"
@@ -566,6 +566,7 @@
     "@vscode/test-electron": "^3.1.0",
     "@vscode/vsce": "^4.1.0",
     "esbuild": "^0.28.2",
+    "happy-dom": "^21.0.4",
     "mocha": "^12.0.3",
     "playwright-core": "^1.65.0",
     "typescript": "^7.0.2"

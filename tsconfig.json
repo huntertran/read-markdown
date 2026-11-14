@@ -14,5 +14,6 @@
     "forceConsistentCasingInFileNames": true,
     "noEmit": true
   },
-  "include": ["src/**/*.ts", "test/**/*.ts", "types/**/*.d.ts"]
+  "include": ["src/**/*.ts", "test/**/*.ts", "types/**/*.d.ts"],
+  "exclude": ["test/webview"]
 }
