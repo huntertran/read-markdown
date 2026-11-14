@@ -179,7 +179,7 @@ export function createMarkdownRenderer(): (source: string, options: RenderOption
     return `<pre class="rm-code"${lineAttrs(token)}><code class="hljs">${escapeHtml(token.content)}</code></pre>\n`;
   };
 
-  const defaultImage = md.renderer.rules.image!;
+  const defaultImage = md.renderer.rules.image;
   md.renderer.rules.image = (tokens, idx, options, rawEnv, self) => {
     const env = getEnv(rawEnv);
     rewriteAttr(tokens[idx], 'src', env.options?.resolveResource);

@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      # Node 22: @vscode/vsce and @vscode/test-cli require >= 22 (ESLint 10 and mocha 12 need >= 20.19).
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run check-types
+
+      - run: npm run lint
+
+      # The integration tests download a stable VS Code into .vscode-test; keep it between runs.
+      - uses: actions/cache@v6
+        with:
+          path: .vscode-test
+          key: vscode-test-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: vscode-test-${{ runner.os }}-
+
+      # `pretest` builds the bundles; the integration tests launch a real VS Code, which needs a display on Linux.
+      - run: xvfb-run -a npm test
+
+      - run: npm audit --omit=dev

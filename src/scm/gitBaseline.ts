@@ -125,9 +125,13 @@ export class GitBaseline implements vscode.Disposable {
   }
 
   private stopListening(): void {
-    this.apiListeners.forEach((d) => d.dispose());
+    this.apiListeners.forEach((d) => {
+      d.dispose();
+    });
     this.apiListeners = [];
-    this.watched.forEach((d) => d.dispose());
+    this.watched.forEach((d) => {
+      d.dispose();
+    });
     this.watched.clear();
   }
 
@@ -157,7 +161,9 @@ export class GitBaseline implements vscode.Disposable {
 
   dispose(): void {
     this.emitter.dispose();
-    this.disposables.forEach((d) => d.dispose());
+    this.disposables.forEach((d) => {
+      d.dispose();
+    });
     this.stopListening();
     this.entries.clear();
   }

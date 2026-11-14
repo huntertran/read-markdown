@@ -70,7 +70,9 @@ export class PreviewPanel implements vscode.Disposable {
       panel.onDidDispose(() => this.dispose()),
       panel.onDidChangeViewState(({ webviewPanel }) => {
         if (!webviewPanel.visible) this.findMayBeStale = true;
-        else if (this.renderPending) void this.renderOnShow();
+        else if (this.renderPending) {
+          this.renderOnShow().catch((e: unknown) => this.manager.logError('Rendering after show', e));
+        }
         if (webviewPanel.active) {
           manager.setActive(this);
           if (this.findMayBeStale) {
@@ -80,7 +82,9 @@ export class PreviewPanel implements vscode.Disposable {
             // webview is restored. Close it again; the command only acts on the active webview.
             // https://github.com/microsoft/vscode/issues/307943
             // TODO: remove this workaround (and `findMayBeStale`) once `engines.vscode` >= the fixed version.
-            void vscode.commands.executeCommand('editor.action.webvieweditor.hideFind');
+            vscode.commands
+              .executeCommand('editor.action.webvieweditor.hideFind')
+              .then(undefined, (e: unknown) => this.manager.logError('Closing the find widget', e));
           }
         }
       }),
@@ -145,7 +149,7 @@ export class PreviewPanel implements vscode.Disposable {
     }
     this.renderTimer = setTimeout(() => {
       this.renderTimer = undefined;
-      void this.render();
+      this.render().catch((e: unknown) => this.manager.logError('Rendering', e));
     }, RENDER_DEBOUNCE_MS);
   }
 
@@ -469,7 +473,9 @@ export class PreviewPanel implements vscode.Disposable {
     if (this.renderTimer) clearTimeout(this.renderTimer);
     this.emitter.fire();
     this.emitter.dispose();
-    this.disposables.forEach((d) => d.dispose());
+    this.disposables.forEach((d) => {
+      d.dispose();
+    });
     this.panel.dispose();
   }
 }

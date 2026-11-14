@@ -18,3 +18,5 @@ plan/**
 CLAUDE.md
 docs/**
 scripts/**
+eslint.config.mjs
+.github/**

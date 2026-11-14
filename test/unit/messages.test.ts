@@ -1,4 +1,5 @@
 import * as assert from 'node:assert/strict';
+import { inspect } from 'node:util';
 import type { FromWebview } from '../../src/protocol';
 import { describeMessage, isRestorableScheme, parseFromWebview, uriScheme } from '../../src/preview/messages';
 
@@ -47,7 +48,7 @@ describe('parseFromWebview: valid messages', () => {
   });
 
   it('accepts a message that went through structured clone / JSON', () => {
-    const m = JSON.parse(JSON.stringify({ type: 'moveListItem', starts: [3, 5], end: 8, from: 1, to: 0, docVersion: 9 }));
+    const m: unknown = JSON.parse(JSON.stringify({ type: 'moveListItem', starts: [3, 5], end: 8, from: 1, to: 0, docVersion: 9 }));
     assert.deepEqual(parseFromWebview(m), m);
   });
 });
@@ -55,7 +56,7 @@ describe('parseFromWebview: valid messages', () => {
 describe('parseFromWebview: invalid input', () => {
   it('rejects non-objects', () => {
     for (const bad of [null, undefined, 'ready', 42, true, [], [{ type: 'ready' }], () => ({ type: 'ready' })]) {
-      assert.equal(parseFromWebview(bad), undefined, String(bad));
+      assert.equal(parseFromWebview(bad), undefined, inspect(bad));
     }
   });
 

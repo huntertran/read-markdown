@@ -66,7 +66,9 @@ export class CustomCssProvider implements vscode.Disposable {
   }
 
   private disposeWatchers(): void {
-    this.watchers.forEach((w) => w.dispose());
+    this.watchers.forEach((w) => {
+      w.dispose();
+    });
     this.watchers = [];
   }
 

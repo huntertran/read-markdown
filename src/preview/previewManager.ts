@@ -82,6 +82,11 @@ export class PreviewManager implements vscode.Disposable {
     this.output.appendLine(`[${new Date().toISOString()}] ${message}`);
   }
 
+  /** Logs a rejected background task: the error message only, never the document. */
+  logError(task: string, error: unknown): void {
+    this.log(`${task} failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
   // ---- panel registry --------------------------------------------------------------------
 
   private panelsFor(uri: vscode.Uri): PreviewPanel[] {
@@ -164,7 +169,7 @@ export class PreviewManager implements vscode.Disposable {
   }
 
   private broadcastConfig(): void {
-    for (const p of this.panels) void p.sendConfig();
+    for (const p of this.panels) p.sendConfig().catch((e: unknown) => this.logError('Sending the config', e));
   }
 
   private onConfigChanged(): void {
@@ -177,7 +182,7 @@ export class PreviewManager implements vscode.Disposable {
       prev.changesMode !== this.settings.changesMode ||
       prev.agentProgress !== this.settings.agentProgress
     ) {
-      for (const p of this.panels) void p.render();
+      for (const p of this.panels) p.render().catch((e: unknown) => this.logError('Rendering', e));
     }
     if (prev.searchSyncSelection && !this.settings.searchSyncSelection) for (const p of this.panels) p.clearHighlight();
   }
@@ -304,12 +309,17 @@ export class PreviewManager implements vscode.Disposable {
     const key = editor.document.uri.toString();
     if (this.autoOpened.has(key) || this.panelsFor(editor.document.uri).length > 0) return;
     this.autoOpened.add(key);
-    if (mode === 'beside') void this.open(editor.document.uri, vscode.ViewColumn.Beside, true);
-    else void this.open(editor.document.uri, editor.viewColumn, false);
+    const opening =
+      mode === 'beside'
+        ? this.open(editor.document.uri, vscode.ViewColumn.Beside, true)
+        : this.open(editor.document.uri, editor.viewColumn, false);
+    opening.catch((e: unknown) => this.logError('Opening the preview automatically', e));
   }
 
   dispose(): void {
     for (const p of [...this.panels]) p.dispose();
-    this.disposables.forEach((d) => d.dispose());
+    this.disposables.forEach((d) => {
+      d.dispose();
+    });
   }
 }
