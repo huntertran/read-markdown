@@ -44,8 +44,6 @@ export type Reference =
   | { kind: 'unsupported'; scheme: string }
   | {
       kind: 'local';
-      /** How the reference was written: next to the document, `/…` from the workspace folder, or a `file:` URI. */
-      via: 'relative' | 'workspace-root' | 'file-uri';
       scheme: string;
       authority: string;
       /** Normalised (`.`/`..` resolved after percent-decoding). */
@@ -94,7 +92,7 @@ export function resolveReference(ref: string, context: PathContext): Reference {
 
   const located = decoded.startsWith('/') ? resolveWorkspaceRoot(decoded, context) : resolveRelative(decoded, context);
   if (!located) return { kind: 'invalid', reason: 'no-base' };
-  return withInside({ kind: 'local', via: decoded.startsWith('/') ? 'workspace-root' : 'relative', ...located, query, fragment }, context);
+  return withInside({ kind: 'local', ...located, query, fragment }, context);
 }
 
 /**
@@ -223,7 +221,6 @@ function parseFileUri(href: string): Omit<Local, 'inside'> {
   if (!p.startsWith('/')) p = '/' + p;
   return {
     kind: 'local',
-    via: 'file-uri',
     scheme: 'file',
     authority: gracefulDecode(m?.[2] ?? ''),
     path: path.posix.normalize(p),

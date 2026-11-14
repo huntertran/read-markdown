@@ -11,6 +11,7 @@ A reading-focused Markdown preview for VS Code, built for the long documents AI 
 - **Collapsible sections**: fold the content under any heading with the chevron next to it. Folded sections are remembered while you edit.
 - **Search highlight sync**: select text in the Markdown source, or step through matches with the Find widget (`Ctrl+F`, then `Enter`/`F3`). Every occurrence is highlighted in the preview, and it scrolls to the current match.
 - **Scroll sync** between the source and the preview, in both directions.
+- **Links**: links to other Markdown files open in a preview, with `#heading` links revealing the heading. Links to files outside your workspace folders and the document's folder ask for confirmation before opening.
 - **Typography and colors**: theme presets (follow VS Code, light, dark, sepia, high contrast), body font, size, line height, content width, background and text colors, plus heading font, size, color and highlight style.
 - **Custom CSS**, inline in settings or from files. Files are watched and reloaded live.
 - **Quick settings panel** (⚙ in the preview) for the most common options. It writes your VS Code settings.

@@ -252,17 +252,31 @@ export class PreviewManager implements vscode.Disposable {
       case 'fragment':
         for (const p of this.panelsFor(from)) p.revealHeading(ref.fragment);
         return;
-      case 'local':
-        // `ref.inside` tells whether the target is in the workspace or the document's folder; not acted on yet.
-        // A `file:` URI keeps its query and fragment in the target (the heading is not revealed).
-        if (ref.via === 'file-uri') await this.openLocal(toUri(ref).with({ query: ref.query, fragment: ref.fragment }));
-        else await this.openLocal(toUri(ref), ref.fragment);
+      case 'local': {
+        // The fragment (a heading) is passed on, the query is dropped.
+        const target = toUri(ref);
+        // Outside the workspace folders and the document's folder: ask first, before anything touches the file
+        // system (a stat of `\\host\share\x` already makes a network request that can leak credentials).
+        if (!ref.inside && !(await this.confirmOutsideTarget(target))) return;
+        await this.openLocal(target, ref.fragment);
         return;
+      }
       // Other schemes (command:, vscode:, javascript:...) are ignored on purpose, and so is an empty href.
       case 'unsupported':
       case 'invalid':
         return;
     }
+  }
+
+  /** True if the user agrees to open a link target outside the workspace folders and the document's folder. */
+  private async confirmOutsideTarget(target: vscode.Uri): Promise<boolean> {
+    const shown = target.scheme === 'file' ? target.fsPath : target.toString(true);
+    const choice = await vscode.window.showWarningMessage(
+      'This link opens a file outside the workspace.',
+      { modal: true, detail: `The link points to:\n${shown}` },
+      'Open',
+    );
+    return choice === 'Open';
   }
 
   private async openLocal(target: vscode.Uri, fragment = ''): Promise<void> {

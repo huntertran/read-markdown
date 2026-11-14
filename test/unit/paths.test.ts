@@ -25,7 +25,6 @@ describe('resolveReference: document-relative paths', () => {
     for (const ref of ['x.md', './x.md', 'sub/../x.md']) {
       const r = local(ref);
       assert.equal(r.path, '/home/u/proj/docs/x.md', ref);
-      assert.equal(r.via, 'relative');
       assert.equal(r.inside, true);
     }
     assert.equal(local('img/x.png').path, '/home/u/proj/docs/img/x.png');
@@ -60,7 +59,6 @@ describe('resolveReference: document-relative paths', () => {
 describe('resolveReference: workspace-absolute paths', () => {
   it('resolves against the workspace folder of the document', () => {
     const r = local('/docs/x.md');
-    assert.equal(r.via, 'workspace-root');
     assert.equal(r.path, '/home/u/proj/docs/x.md');
     assert.equal(r.inside, true);
   });
@@ -101,7 +99,7 @@ describe('resolveReference: workspace-absolute paths', () => {
 describe('resolveReference: file: URIs', () => {
   it('reads path, authority, query and fragment', () => {
     const r = local('file:///etc/passwd');
-    assert.deepEqual([r.via, r.scheme, r.authority, r.path, r.inside], ['file-uri', 'file', '', '/etc/passwd', false]);
+    assert.deepEqual([r.scheme, r.authority, r.path, r.inside], ['file', '', '/etc/passwd', false]);
     const h = local('file://host/share/x.md?a=1#top');
     assert.deepEqual([h.authority, h.path, h.query, h.fragment], ['host', '/share/x.md', 'a=1', 'top']);
   });
@@ -359,5 +357,59 @@ describe('isInsideRoots', () => {
     assert.equal(local('x.md', upper).inside, true);
     assert.equal(local('file:///c:/PROJ/x.md', upper).inside, true);
     assert.equal(local('file:///c:/PROJ/x.md', { ...upper, caseInsensitive: false }).inside, false);
+  });
+});
+
+describe('inside: which links ask before opening', () => {
+  const folder = { scheme: 'file', authority: '', path: '/c:/proj' };
+
+  it('is false for UNC targets however they are written', () => {
+    assert.equal(local('\\\\host\\share\\x.md', WIN).inside, false);
+    assert.equal(local('//host/share/x.md', { ...WIN, workspaceFolders: [] }).inside, false);
+    assert.equal(local('file://host/share/x.md', WIN).inside, false);
+  });
+
+  it('is true for //host/share/x.md when a workspace folder exists: it is workspace-relative', () => {
+    assert.equal(local('//host/share/x.md', WIN).inside, true);
+  });
+
+  it('ignores drive-letter case between the document and the workspace folder', () => {
+    const upperFolder = { ...WIN, workspaceFolders: [{ ...folder, path: '/C:/proj' }] };
+    const upperDoc = { ...WIN, document: { ...WIN.document, path: '/C:/proj/docs/guide.md' } };
+    for (const ctx of [upperFolder, upperDoc]) {
+      assert.equal(local('x.md', ctx).inside, true);
+      assert.equal(local('../x.md', ctx).inside, true);
+      assert.equal(local('/docs/x.md', ctx).inside, true);
+      assert.equal(local('file:///c:/proj/x.md', ctx).inside, true);
+    }
+  });
+
+  it('is true for a target equal to a root, with or without a trailing slash', () => {
+    assert.equal(local('..', POSIX).inside, true);
+    assert.equal(local('../', POSIX).inside, true);
+    assert.equal(local('../..', POSIX).inside, false);
+    assert.equal(local('file:///home/u/proj').inside, true);
+    assert.equal(local('file:///home/u/proj/').inside, true);
+  });
+
+  it('is false in a non-file document for a target outside every workspace folder', () => {
+    const remote: PathContext = {
+      document: { scheme: 'vscode-remote', authority: 'box', path: '/srv/proj/a.md' },
+      workspaceFolders: [{ scheme: 'vscode-remote', authority: 'box', path: '/srv/proj' }],
+    };
+    assert.equal(local('x.md', remote).inside, true);
+    assert.equal(local('../other/x.md', remote).inside, false);
+    assert.equal(local('file:///srv/proj/x.md', remote).inside, false); // another file system
+  });
+
+  it('is false for every local target when there is no workspace and no folder', () => {
+    const untitled: PathContext = { document: { scheme: 'untitled', authority: '', path: 'Untitled-1' }, workspaceFolders: [] };
+    assert.equal(local('x.md', untitled).inside, false);
+    assert.equal(local('/etc/hosts', untitled).inside, false);
+  });
+
+  it('keeps the fragment of a file: URI for the heading and does not need the query', () => {
+    const r = local('file:///home/u/proj/x.md?a=1#%E4%B8%AD');
+    assert.deepEqual([r.path, r.fragment], ['/home/u/proj/x.md', '\u4e2d']);
   });
 });
