@@ -119,6 +119,39 @@ describe('neutralizeReservedAttributes', () => {
     assert.equal(clean('<div title="x" data-line="unterminated'), '<div title="x">');
   });
 
+  describe('deliberately nested input (several removal rounds)', () => {
+    /**
+     * `depth` reserved attributes nested in each other inside a comment (the tag tokenizer skips comments, so only the
+     * safety net works on it): `data-li` x depth + `data-line="0"` + `ne="1"` ... `ne="depth"`. Each round removes the
+     * innermost `data-line="..."`, which glues the `data-li` before it to the `ne="..."` after it, and that is the
+     * next `data-line="..."`. So `depth` removals take about `depth` changing rounds.
+     */
+    function nested(depth: number): string {
+      let html = `<!--${'data-li'.repeat(depth)}data-line="0"`;
+      for (let i = 1; i <= depth; i++) html += `ne="${i}"`;
+      return `${html}-->`;
+    }
+
+    it('cleans an input that needs several rounds but stays under the limit', () => {
+      // Measured against MAX_ROUNDS = 8: depth 6 is the deepest that still comes out clean, depth 7 is the first that fails closed.
+      for (const depth of [1, 3, 6]) {
+        const out = clean(nested(depth));
+        assert.ok(!/data-line\s*=/i.test(out), `depth ${depth}: ${out}`);
+        assert.equal(out, '<!---->', `depth ${depth}`);
+      }
+    });
+
+    it('fails closed (returns an empty string) when the removals keep exposing new ones past the round limit', () => {
+      for (const depth of [7, 8, 20]) {
+        assert.equal(clean(nested(depth)), '', `depth ${depth}`);
+      }
+    });
+
+    it('keeps the surrounding text out of the result when it fails closed', () => {
+      assert.equal(clean(`<p>before</p>${nested(12)}<p>after</p>`), '');
+    });
+  });
+
   it('is idempotent', () => {
     for (const html of ['<div data-line=1 data-lidata-line=2ne=3>', '<div title="a', '<p DATA-RM-X=1>', 'text <b data-task>']) {
       const once = clean(html);

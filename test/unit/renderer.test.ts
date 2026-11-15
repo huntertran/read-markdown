@@ -1,4 +1,6 @@
 import * as assert from 'node:assert/strict';
+import { mock } from 'node:test';
+import hljs from 'highlight.js/lib/common';
 import { createMarkdownRenderer } from '../../src/render/markdown';
 
 const render = createMarkdownRenderer();
@@ -60,6 +62,56 @@ describe('markdown renderer', () => {
     assert.match(r.html, /class="hljs language-ts"/);
     assert.match(r.html, /hljs-keyword/);
     assert.match(r.html, /&lt;b&gt;/);
+  });
+
+  describe('when highlight.js throws', () => {
+    // The renderer builds its highlighter from `hljs.highlight` at call time, so replacing that method on the
+    // (per test file bundled) highlight.js instance reaches `safeHighlight`'s catch without any seam in src/.
+    afterEach(() => {
+      mock.restoreAll();
+    });
+    function failHighlighting(): void {
+      mock.method(hljs, 'highlight', () => {
+        throw new Error('boom');
+      });
+    }
+
+    it('still renders the fence, HTML-escaped, with its line attributes', () => {
+      failHighlighting();
+      const r = render('intro\n\n```ts\nconst x = "<script>alert(1)</script>"; // a & b\n```\n', opts);
+      assert.match(
+        r.html,
+        /<pre class="rm-code" data-line="2" data-line-end="5" data-lang="ts"><code class="hljs language-ts">const x = &quot;&lt;script&gt;alert\(1\)&lt;\/script&gt;&quot;; \/\/ a &amp; b\n<\/code><\/pre>/,
+      );
+      assert.doesNotMatch(r.html, /<script/i);
+      assert.doesNotMatch(r.html, /hljs-/);
+      assert.deepEqual(r.blockLines, [0, 2]);
+      assert.deepEqual(
+        r.topBlocks.map((b) => [b.line, b.end]),
+        [
+          [0, 1],
+          [2, 5],
+        ],
+      );
+    });
+
+    it('escapes the front matter the same way', () => {
+      failHighlighting();
+      const r = render('---\ntitle: "<img src=x onerror=alert(1)>"\n---\n# H\n', opts);
+      assert.match(r.html, /<details class="rm-frontmatter" data-line="0" data-line-end="3">/);
+      assert.match(r.html, /<code class="hljs language-yaml">title: &quot;&lt;img src=x onerror=alert\(1\)&gt;&quot;<\/code>/);
+      assert.doesNotMatch(r.html, /<img/i);
+    });
+
+    it('does not cache the failure: the same fence is highlighted once highlighting works again', () => {
+      const src = '```ts\nconst unique = "<b>cache probe</b>";\n```\n';
+      failHighlighting();
+      assert.doesNotMatch(render(src, opts).html, /hljs-keyword/);
+      mock.restoreAll();
+      const ok = render(src, opts).html;
+      assert.match(ok, /hljs-keyword/);
+      assert.doesNotMatch(ok, /<b>/);
+    });
   });
 
   it('renders mermaid fences as diagram placeholders only when enabled', () => {

@@ -87,7 +87,7 @@ function lineOf(node: Node): number {
   return el ? Number(el.dataset.line) : 0;
 }
 
-function pickCurrent(root: HTMLElement, ranges: Range[], req: SearchRequest): number {
+export function pickCurrent(root: HTMLElement, ranges: Range[], req: SearchRequest): number {
   // Outermost element starting at the source block that contains the selection.
   const block = root.querySelector(`[data-line="${req.blockLine}"]`);
   if (block) {

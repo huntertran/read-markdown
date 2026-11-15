@@ -51,7 +51,7 @@ const MERMAID_THEME_LABELS: Record<MermaidTheme, string> = {
 const MERMAID_LOOK_LABELS: Record<MermaidLook, string> = { classic: 'Classic', neo: 'Neo', handDrawn: 'Hand-drawn' };
 const CHANGES_MODE_LABELS: Record<ChangesMode, string> = { inline: 'Inline', gutter: 'Bars only', off: 'Off' };
 
-type Control =
+export type Control =
   | { kind: 'select'; key: QuickSettingKey; label: string; options: [string, string][]; get: (c: UiConfig) => string; parse?: (v: string) => unknown }
   /** `disabled`: greyed out while true (e.g. width slider while filling the screen width). */
   | { kind: 'range'; key: QuickSettingKey; label: string; min: number; max: number; step: number; get: (c: UiConfig) => number; format: (v: number) => string; disabled?: (c: UiConfig) => boolean }
@@ -60,7 +60,7 @@ type Control =
   /** `cssVar` is previewed live while picking; `probe` is the CSS property read from a sample cell for the default. */
   | { kind: 'color'; key: QuickSettingKey; label: string; cssVar: string; probe: 'backgroundColor' | 'color'; get: (c: UiConfig) => string };
 
-interface Section {
+export interface Section {
   /** Stable id, saved in `WebviewState.settingsTab` when its tab is selected. */
   id: string;
   title: string;
@@ -69,7 +69,7 @@ interface Section {
   controls: Control[];
 }
 
-const SECTIONS: Section[] = [
+export const SECTIONS: Section[] = [
   {
     id: 'appearance',
     title: 'Appearance',

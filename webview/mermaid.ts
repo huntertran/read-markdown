@@ -106,7 +106,7 @@ const DARK_VARIANT: Partial<Record<MermaidTheme, string>> = {
   'redux-color': 'redux-dark-color',
 };
 
-function mermaidConfig(opts: MermaidOptions): Record<string, unknown> {
+export function mermaidConfig(opts: MermaidOptions): Record<string, unknown> {
   const base = { startOnLoad: false, securityLevel: 'strict', look: opts.look };
   if (opts.theme !== 'auto') {
     const theme = (opts.scheme === 'dark' && DARK_VARIANT[opts.theme]) || opts.theme;
