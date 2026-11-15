@@ -45,7 +45,8 @@ export function initTaskProgress(opts: { content: HTMLElement; bar: HTMLElement;
   followButton.addEventListener('click', () => {
     patchState({ followTasks: !following() });
     syncFollowButton(true);
-    if (following()) revealFirst(content.querySelectorAll<HTMLElement>(`${ITEM}[data-task="active"]`), true);
+    // (`taskItems`: a removed clone keeps `data-task`, but is not a step of the current document.)
+    if (following()) revealFirst(taskItems().filter((li) => li.dataset.task === 'active'), true);
   });
   content.addEventListener('animationend', (e) => {
     if (e.animationName === 'rm-task-just-done') (e.target as Element).closest(`.${JUST_DONE_CLASS}`)?.classList.remove(JUST_DONE_CLASS);
@@ -78,7 +79,9 @@ function itemText(li: HTMLElement): string {
   let text = '';
   const walker = document.createTreeWalker(own, NodeFilter.SHOW_TEXT);
   for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-    if (!n.parentElement?.closest('del.rm-del, ul, ol')) text += n.textContent;
+    // Only inside this item: `closest` would otherwise find the list the item itself is in.
+    const skipped = n.parentElement?.closest('del.rm-del, ul, ol');
+    if (!skipped || !li.contains(skipped)) text += n.textContent;
   }
   return text.replace(/\s+/g, ' ').trim();
 }

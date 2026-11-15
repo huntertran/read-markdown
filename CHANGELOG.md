@@ -36,6 +36,9 @@
   in the preview.
 - Fixed: in gutter mode, a nested list removed from a list item now shows a removal mark; adding or
   removing a nested list no longer flags the parent item's text as changed.
+- Fixed: task progress followed steps by their position instead of their text, so when an agent
+  inserted, reordered or reworded steps the "just done" flash and the follow-scroll could pick the wrong
+  step. The follow button no longer scrolls to a removed step shown by track changes.
 - Fixed: in-preview editing: Esc or Cancel while a save is in progress no longer closes the editor (a
   failed save then had nowhere to show its message and the typed text was gone), and an editor no longer
   opens after editing was turned off.
