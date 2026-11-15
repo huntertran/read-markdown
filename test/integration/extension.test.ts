@@ -2,7 +2,7 @@ import * as assert from 'node:assert/strict';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { applyBlockEdit, moveListItemEdit, readBlock, toggleTask } from '../../src/edit/blockEdit';
-import { GitBaseline } from '../../src/scm/gitBaseline';
+import { createGitBaseline } from '../../src/scm/vscodeGit';
 
 const EXTENSION_ID = 'huntertran.read-markdown';
 
@@ -153,7 +153,7 @@ describe('Read Markdown extension', () => {
   });
 
   it('has no git baseline for documents that are not files', async () => {
-    const baseline = new GitBaseline();
+    const baseline = createGitBaseline();
     try {
       const doc = await vscode.workspace.openTextDocument({ language: 'markdown', content: '# x\n' });
       assert.equal(await baseline.getOriginal(doc.uri), undefined);

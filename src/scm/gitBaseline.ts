@@ -1,19 +1,20 @@
 // The git index version of a file, read through the built-in Git extension's public API (the same
 // original VS Code's editor gutter compares against). VS Code's own SCM diff hooks for custom editors
-// are proposed API, so this is the stable route.
-import * as vscode from 'vscode';
+// are proposed API, so this is the stable route. No runtime `vscode` import: the extension lookup and
+// the event emitter are injected (`vscodeGit.ts` wires the real ones), so this runs under plain mocha.
+import type * as vscode from 'vscode';
 
 // Minimal subset of the Git extension API (extensions/git/src/api/git.d.ts in microsoft/vscode).
-interface GitRepository {
+export interface GitRepository {
   readonly rootUri: vscode.Uri;
   readonly state: { readonly onDidChange: vscode.Event<void> };
   /** `ref` '' = the index (`git show :path`). */
   show(ref: string, path: string): Promise<string>;
 }
 
-type ApiState = 'uninitialized' | 'initialized';
+export type ApiState = 'uninitialized' | 'initialized';
 
-interface GitApi {
+export interface GitApi {
   readonly state: ApiState;
   readonly onDidChangeState: vscode.Event<ApiState>;
   readonly onDidOpenRepository: vscode.Event<GitRepository>;
@@ -21,23 +22,42 @@ interface GitApi {
   getRepository(uri: vscode.Uri): GitRepository | null;
 }
 
-interface GitExtension {
+export interface GitExtension {
   readonly enabled: boolean;
   readonly onDidChangeEnablement: vscode.Event<boolean>;
   getAPI(version: 1): GitApi;
 }
 
+/** The parts of `vscode.Extension<GitExtension>` that are used. */
+export type GitExtensionHandle = Pick<vscode.Extension<GitExtension>, 'isActive' | 'exports' | 'activate'>;
+
+/** The parts of `vscode.EventEmitter` that are used. */
+export interface Emitter<T> extends vscode.Disposable {
+  readonly event: vscode.Event<T>;
+  fire(data: T): void;
+}
+
+/** What `GitBaseline` needs from VS Code. */
+export interface GitBaselinePorts {
+  /** `vscode.extensions.getExtension('vscode.git')`: undefined if the Git extension is not installed. */
+  getGitExtension(): GitExtensionHandle | undefined;
+  /** A `vscode.EventEmitter` for `onDidChange`. */
+  createEmitter(): Emitter<vscode.Uri | undefined>;
+}
+
 interface Entry {
   repo: GitRepository;
+  /** The file (kept so a refresh re-reads it without parsing the map key back into a Uri). */
+  uri: vscode.Uri;
   /** Resolved index content; undefined = not in the index (untracked, ignored, new). */
   text: Promise<string | undefined>;
 }
 
 export class GitBaseline implements vscode.Disposable {
   private readonly disposables: vscode.Disposable[] = [];
-  private readonly emitter = new vscode.EventEmitter<vscode.Uri | undefined>();
+  private readonly emitter: Emitter<vscode.Uri | undefined>;
   /** Fires with the file whose baseline changed, or undefined when any may have (git became available). */
-  readonly onDidChange = this.emitter.event;
+  readonly onDidChange: vscode.Event<vscode.Uri | undefined>;
   private readonly entries = new Map<string, Entry>();
   /** Repository state listeners; disposed when the repository closes or the Git API is replaced. */
   private readonly watched = new Map<GitRepository, vscode.Disposable>();
@@ -45,6 +65,11 @@ export class GitBaseline implements vscode.Disposable {
   private apiListeners: vscode.Disposable[] = [];
   private api: GitApi | undefined;
   private connecting = false;
+
+  constructor(private readonly ports: GitBaselinePorts) {
+    this.emitter = ports.createEmitter();
+    this.onDidChange = this.emitter.event;
+  }
 
   /**
    * The file's content in the git index, or undefined if there is none (no repository, untracked,
@@ -60,7 +85,7 @@ export class GitBaseline implements vscode.Disposable {
     const key = uri.toString();
     let entry = this.entries.get(key);
     if (!entry || entry.repo !== repo) {
-      entry = { repo, text: read(repo, uri) };
+      entry = { repo, uri, text: read(repo, uri) };
       this.entries.set(key, entry);
     }
     return entry.text;
@@ -83,7 +108,7 @@ export class GitBaseline implements vscode.Disposable {
 
   private async activate(): Promise<void> {
     try {
-      const ext = vscode.extensions.getExtension<GitExtension>('vscode.git');
+      const ext = this.ports.getGitExtension();
       if (!ext) return;
       const git = ext.isActive ? ext.exports : await ext.activate();
       this.disposables.push(
@@ -150,11 +175,11 @@ export class GitBaseline implements vscode.Disposable {
   private async refresh(repo: GitRepository): Promise<void> {
     for (const [key, entry] of [...this.entries]) {
       if (entry.repo !== repo) continue;
-      const uri = vscode.Uri.parse(key);
+      const { uri } = entry;
       const next = read(repo, uri);
       const [before, after] = await Promise.all([entry.text, next]);
       if (this.entries.get(key) !== entry) continue;
-      this.entries.set(key, { repo, text: next });
+      this.entries.set(key, { repo, uri, text: next });
       if (before !== after) this.emitter.fire(uri);
     }
   }

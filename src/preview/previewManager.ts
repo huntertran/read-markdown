@@ -5,7 +5,7 @@ import { type Settings, getSettings, toUiConfig, updateSetting, validateQuickSet
 import { buildCssVariables } from '../config/styles';
 import type { ToWebview, WebviewState } from '../protocol';
 import { type RenderOptions, type RenderResult, createMarkdownRenderer } from '../render/markdown';
-import { GitBaseline } from '../scm/gitBaseline';
+import { createGitBaseline } from '../scm/vscodeGit';
 import { EditorScrollGuard } from '../sync/scrollEcho';
 import { isRestorableScheme, uriScheme } from './messages';
 import { LinkOpener, outsideTargetPrompt } from './linkOpener';
@@ -23,7 +23,7 @@ export class PreviewManager implements vscode.Disposable {
   private readonly renderer = createMarkdownRenderer();
   private readonly customCss = new CustomCssProvider();
   /** Git index versions, for showing changes in the preview. */
-  readonly baseline = new GitBaseline();
+  readonly baseline = createGitBaseline();
   /** Which editor scroll events are the user's (not echoes of the preview, not multi-line edits). */
   private readonly editorScroll = new EditorScrollGuard<vscode.TextEditor>();
   private readonly autoOpened = new Set<string>();
