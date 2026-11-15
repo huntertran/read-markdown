@@ -36,6 +36,8 @@
   in the preview.
 - Fixed: in gutter mode, a nested list removed from a list item now shows a removal mark; adding or
   removing a nested list no longer flags the parent item's text as changed.
+- Fixed: if the Mermaid script failed to load once, diagrams stayed broken until the preview was
+  reloaded; the next render now tries again.
 - Fixed: Find (Ctrl/Cmd+F) in the preview now also finds text in collapsed sections and expands the
   section of the match; before, collapsed sections were skipped.
 - Fixed: task progress followed steps by their position instead of their text, so when an agent

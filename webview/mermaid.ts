@@ -36,8 +36,14 @@ function load(): Promise<MermaidApi> {
     const script = document.createElement('script');
     script.src = document.body.dataset.mermaidSrc ?? '';
     script.nonce = SCRIPT_NONCE;
-    script.onload = () => (window.mermaid ? resolve(window.mermaid) : reject(new Error('Mermaid failed to load')));
-    script.onerror = () => reject(new Error('Mermaid failed to load'));
+    // A failed load is not kept: the next render tries again (the file may be readable by then).
+    const fail = (): void => {
+      loading = undefined;
+      script.remove();
+      reject(new Error('Mermaid failed to load'));
+    };
+    script.onload = () => (window.mermaid ? resolve(window.mermaid) : fail());
+    script.onerror = fail;
     document.head.append(script);
   });
   return loading;
@@ -164,6 +170,8 @@ async function render(root: HTMLElement, opts: MermaidOptions): Promise<void> {
     mermaid.initialize(config);
     initializedKey = key;
   }
+  // (A block marked by an earlier failed load is drawn now.)
+  pending.forEach((b) => b.classList.remove('rm-mermaid-error'));
   await mermaid.run({ nodes: pending, suppressErrors: true });
   for (const block of pending) {
     block.dataset.rmConfig = key;
