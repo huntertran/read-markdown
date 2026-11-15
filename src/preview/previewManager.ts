@@ -7,11 +7,10 @@ import type { ToWebview, WebviewState } from '../protocol';
 import { type RenderOptions, type RenderResult, createMarkdownRenderer } from '../render/markdown';
 import { GitBaseline } from '../scm/gitBaseline';
 import { isRestorableScheme, uriScheme } from './messages';
-import { resolveReference } from './paths';
+import { LinkOpener, outsideTargetPrompt } from './linkOpener';
 import { pathContextFor, toUri } from './pathContext';
 import { PREVIEW_VIEW_TYPE, PreviewPanel } from './previewPanel';
 
-const MARKDOWN_EXT = /\.(md|markdown|mdown|mkd|mkdn)$/i;
 const SCROLL_ECHO_MS = 300;
 
 export function isMarkdownDocument(doc: vscode.TextDocument): boolean {
@@ -34,6 +33,30 @@ export class PreviewManager implements vscode.Disposable {
    */
   private readonly editorTopLine = new WeakMap<vscode.TextEditor, number>();
   private readonly autoOpened = new Set<string>();
+  private readonly links = new LinkOpener({
+    pathContext: (from) => pathContextFor(from),
+    toUri,
+    confirm: async (target) => {
+      const { message, detail, accept } = outsideTargetPrompt(target);
+      return (await vscode.window.showWarningMessage(message, { modal: true, detail }, accept)) === accept;
+    },
+    stat: async (target) => {
+      await vscode.workspace.fs.stat(target);
+    },
+    warn: (message) => {
+      void vscode.window.showWarningMessage(message);
+    },
+    openPreview: (target) => this.open(target, this.active?.panel.viewColumn ?? vscode.ViewColumn.Active, false),
+    openFile: async (target) => {
+      await vscode.commands.executeCommand('vscode.open', target);
+    },
+    openExternal: async (href) => {
+      await vscode.env.openExternal(vscode.Uri.parse(href, true));
+    },
+    revealFragment: (from, fragment) => {
+      for (const p of this.panelsFor(from)) p.revealHeading(fragment);
+    },
+  });
   private active: PreviewPanel | undefined;
   settings: Settings = getSettings();
 
@@ -244,63 +267,7 @@ export class PreviewManager implements vscode.Disposable {
   }
 
   async openLink(from: vscode.Uri, href: string): Promise<void> {
-    const ref = resolveReference(href, pathContextFor(from));
-    switch (ref.kind) {
-      case 'external':
-        await vscode.env.openExternal(vscode.Uri.parse(href, true));
-        return;
-      case 'fragment':
-        for (const p of this.panelsFor(from)) p.revealHeading(ref.fragment);
-        return;
-      case 'local': {
-        // The fragment (a heading) is passed on, the query is dropped.
-        const target = toUri(ref);
-        // Outside the workspace folders and the document's folder: ask first, before anything touches the file
-        // system (a stat of `\\host\share\x` already makes a network request that can leak credentials).
-        if (!ref.inside && !(await this.confirmOutsideTarget(target))) return;
-        await this.openLocal(target, ref.fragment);
-        return;
-      }
-      // Other schemes (command:, vscode:, javascript:...) are ignored on purpose, and so is an empty href.
-      case 'unsupported':
-      case 'invalid':
-        return;
-    }
-  }
-
-  /** True if the user agrees to open a link target outside the workspace folders and the document's folder. */
-  private async confirmOutsideTarget(target: vscode.Uri): Promise<boolean> {
-    const shown = target.scheme === 'file' ? target.fsPath : target.toString(true);
-    const choice = await vscode.window.showWarningMessage(
-      'This link opens a file outside the workspace.',
-      { modal: true, detail: `The link points to:\n${shown}` },
-      'Open',
-    );
-    return choice === 'Open';
-  }
-
-  private async openLocal(target: vscode.Uri, fragment = ''): Promise<void> {
-    try {
-      await vscode.workspace.fs.stat(target);
-    } catch {
-      void vscode.window.showWarningMessage(`Read Markdown: file not found: ${target.fsPath || target.toString()}`);
-      return;
-    }
-    if (MARKDOWN_EXT.test(target.path)) {
-      const column = this.active?.panel.viewColumn ?? vscode.ViewColumn.Active;
-      const preview = await this.open(target, column, false);
-      if (fragment) {
-        let heading: string;
-        try {
-          heading = decodeURIComponent(fragment);
-        } catch {
-          heading = fragment;
-        }
-        preview.revealHeading(heading);
-      }
-      return;
-    }
-    await vscode.commands.executeCommand('vscode.open', target);
+    await this.links.open(from, href);
   }
 
   // ---- auto open -------------------------------------------------------------------------
