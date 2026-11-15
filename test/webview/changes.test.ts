@@ -1,8 +1,8 @@
 import * as assert from 'node:assert/strict';
 import { diffDocument } from '../../src/diff/blockDiff';
-import type { BlockChange, DocChanges } from '../../src/protocol';
+import type { BlockChange } from '../../src/protocol';
 import { createMarkdownRenderer } from '../../src/render/markdown';
-import { applyChanges, CHANGED_SELECTOR, REMOVED_SELECTOR } from '../../webview/changes';
+import { applyChanges, CHANGED_SELECTOR, indexBaseline, REMOVED_SELECTOR } from '../../webview/changes';
 import { sanitize } from '../../webview/sanitize';
 import { useDom } from './dom';
 
@@ -19,7 +19,7 @@ function run(original: string, current: string, mode: Mode): { root: HTMLElement
   assert.ok(ops, 'diffDocument returned no ops');
   const root = document.createElement('div');
   root.replaceChildren(sanitize(after.html));
-  applyChanges(root, { originalHtml: before.html, ops }, mode);
+  applyChanges(root, ops, indexBaseline(before.html), mode);
   return { root, ops };
 }
 
@@ -27,8 +27,7 @@ function run(original: string, current: string, mode: Mode): { root: HTMLElement
 function runOps(originalHtml: string, html: string, ops: BlockChange[], mode: Mode): HTMLElement {
   const root = document.createElement('div');
   root.replaceChildren(sanitize(html));
-  const changes: DocChanges = { originalHtml, ops };
-  applyChanges(root, changes, mode);
+  applyChanges(root, ops, indexBaseline(originalHtml), mode);
   return root;
 }
 

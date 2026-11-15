@@ -1,5 +1,6 @@
 import type { ToWebview, UiConfig } from '../src/protocol';
 import { $, getState, patchState, post } from './api';
+import { acceptRender, baselineFor, shouldRequestBaseline } from './baseline';
 import { initChangeGutter, scheduleChangeGutter } from './changeGutter';
 import { applyChanges } from './changes';
 import { hideBlockActions, initBlockActions, registerBlockAction, setBlockActionsEnabled } from './blockActions';
@@ -130,8 +131,14 @@ function renderContent(msg: Extract<ToWebview, { type: 'render' }>): void {
 
   content.replaceChildren(sanitize(msg.html));
   const mode = changesMode();
-  const shown = msg.changes && mode !== 'off' ? mode : undefined;
-  if (msg.changes && shown) applyChanges(content, msg.changes, shown);
+  const baseline = msg.changes && mode !== 'off' ? baselineFor(msg.changes.baselineId) : undefined;
+  // Never marks against a baseline other than the one the ops were computed from. A missing one is asked for
+  // (once); until the extension re-sends this render with it, the current content shows without change marks.
+  if (msg.changes && mode !== 'off' && !baseline && shouldRequestBaseline(msg.changes.baselineId)) {
+    post({ type: 'needBaseline', id: msg.changes.baselineId });
+  }
+  const shown = msg.changes && baseline && mode !== 'off' ? mode : undefined;
+  if (msg.changes && baseline && shown) applyChanges(content, msg.changes.ops, baseline, shown);
   body.dataset.changes = shown ?? '';
   updateChangesButton(shown);
   buildSections(content, {
@@ -218,7 +225,9 @@ window.addEventListener('message', (event: MessageEvent<ToWebview>) => {
       applyConfig(msg);
       break;
     case 'render':
-      renderContent(msg);
+      // The baseline is stored on arrival: renderContent may hold this message back for an open editor and
+      // replace it with a later one that cites the same baseline without the HTML.
+      renderContent(acceptRender(msg));
       break;
     case 'highlight':
       setSearch(content, msg);

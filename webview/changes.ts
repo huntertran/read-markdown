@@ -12,7 +12,7 @@
 // Clones lose `data-line*` / `id`, so scroll sync, editing, search and the outline ignore them.
 import { type AlignItem, alignBlocks } from '../src/diff/blockDiff';
 import { diffTokens, similarity, tokenize, tokenizeLines } from '../src/diff/textDiff';
-import type { DocChanges } from '../src/protocol';
+import type { BlockChange } from '../src/protocol';
 import { sanitize } from './sanitize';
 
 /** Removed content shown for reference only (not part of the current document). */
@@ -34,17 +34,28 @@ interface Context {
   marks: number;
 }
 
-export function applyChanges(root: HTMLElement, changes: DocChanges, mode: 'inline' | 'gutter'): void {
-  const ctx: Context = { inline: mode === 'inline', nextMoveId: 0, marks: 0 };
-  const original = new Map<number, HTMLElement>();
+/** The top-level blocks of the original, by source line. */
+export type Baseline = ReadonlyMap<number, HTMLElement>;
+
+/**
+ * Sanitizes the original's HTML and indexes its blocks. `applyChanges` only reads these elements (removed
+ * blocks are cloned in), so one result can serve every render against the same original.
+ */
+export function indexBaseline(originalHtml: string): Baseline {
+  const blocks = new Map<number, HTMLElement>();
   // (`:scope` matches nothing on a DocumentFragment, so walk its children.)
-  for (const el of sanitize(changes.originalHtml).children) {
-    if (el instanceof HTMLElement && el.dataset.lineEnd !== undefined) original.set(Number(el.dataset.line), el);
+  for (const el of sanitize(originalHtml).children) {
+    if (el instanceof HTMLElement && el.dataset.lineEnd !== undefined) blocks.set(Number(el.dataset.line), el);
   }
+  return blocks;
+}
+
+export function applyChanges(root: HTMLElement, ops: readonly BlockChange[], original: Baseline, mode: 'inline' | 'gutter'): void {
+  const ctx: Context = { inline: mode === 'inline', nextMoveId: 0, marks: 0 };
   const current = (line: number | null) =>
     line === null ? null : root.querySelector<HTMLElement>(`:scope > [data-line-end][data-line="${line}"]`);
 
-  for (const op of changes.ops) {
+  for (const op of ops) {
     switch (op.op) {
       case 'ins': {
         const el = current(op.line);

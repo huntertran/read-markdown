@@ -6,6 +6,7 @@ import { isRenderedBlock, isRenderedListMove, isRenderedTaskLine } from '../edit
 import type { DocChanges, EditError, FromWebview, ToWebview } from '../protocol';
 import type { RenderOptions, RenderResult } from '../render/markdown';
 import { blockStartFor, countOccurrences, searchTermFromSelection } from '../sync/selection';
+import { BaselineSync } from './baselineSync';
 import { getWebviewHtml } from './html';
 import { describeMessage, parseFromWebview } from './messages';
 import { allowedRoots, resolveReference } from './paths';
@@ -30,8 +31,12 @@ export class PreviewPanel implements vscode.Disposable {
   private lastRenderVersion = -1;
   /** The git index version last rendered for change display, with the inputs it was rendered from. */
   private originalRender:
-    | { original: string; mermaid: boolean; activeTasks: boolean | undefined; result: RenderResult }
+    | { original: string; mermaid: boolean; activeTasks: boolean | undefined; result: RenderResult; id: number }
     | undefined;
+  /** Source of `DocChanges.baselineId`: bumped whenever `originalRender` is replaced, never reused. */
+  private baselineSeq = 0;
+  /** Which baseline this panel's webview holds; reset whenever the webview (re)loads. */
+  private readonly baselineSync = new BaselineSync();
   /**
    * Inputs of the last render posted to the webview. An identical render would replace the DOM with the same
    * content (a save fires the text change, the file watcher and a git state change), so it is skipped.
@@ -146,6 +151,7 @@ export class PreviewPanel implements vscode.Disposable {
   reloadWebview(): void {
     if (this.disposed) return;
     this.ready = false;
+    this.baselineSync.forget();
     if (this.renderTimer) clearTimeout(this.renderTimer);
     this.renderTimer = undefined;
     this.panel.webview.html = getWebviewHtml(
@@ -245,7 +251,10 @@ export class PreviewPanel implements vscode.Disposable {
     }
     const options: RenderOptions = { mermaid, activeTasks, resolveResource: (p) => this.resolveResource(p) };
     const result = this.manager.render(source, options);
-    const changes = this.changesFor(source, original, result, options);
+    const found = this.changesFor(source, original, result, options);
+    // The baseline travels only when the webview does not hold it (claimed here, in the same turn as the post).
+    const sendBaseline = this.baselineSync.claim(found?.baselineId);
+    const changes: DocChanges | undefined = found && (sendBaseline ? found : { baselineId: found.baselineId, ops: found.ops });
     this.lastRender = result;
     this.lastRenderVersion = docVersion;
     this.posted = { source, original, docVersion, mermaid, activeTasks, changesMode };
@@ -260,7 +269,12 @@ export class PreviewPanel implements vscode.Disposable {
   }
 
   /** Changes of `source` against the file's git index version `original` (undefined: none, or not shown). */
-  private changesFor(source: string, original: string | undefined, current: RenderResult, options: RenderOptions): DocChanges | undefined {
+  private changesFor(
+    source: string,
+    original: string | undefined,
+    current: RenderResult,
+    options: RenderOptions,
+  ): (DocChanges & { originalHtml: string }) | undefined {
     if (original === undefined || eolNormalized(original) === eolNormalized(source)) return undefined;
     // Re-render the original when it or a setting that changes rendering changed.
     let cached = this.originalRender;
@@ -275,11 +289,12 @@ export class PreviewPanel implements vscode.Disposable {
         mermaid: options.mermaid,
         activeTasks: options.activeTasks,
         result: this.manager.render(original, options),
+        id: ++this.baselineSeq,
       };
       this.originalRender = cached;
     }
     const ops = diffDocument(cached.result.topBlocks, current.topBlocks);
-    return ops?.length ? { originalHtml: cached.result.html, ops } : undefined;
+    return ops?.length ? { baselineId: cached.id, originalHtml: cached.result.html, ops } : undefined;
   }
 
   /** Asks the webview to switch between inline changes and gutter bars. */
@@ -377,6 +392,7 @@ export class PreviewPanel implements vscode.Disposable {
         this.lastHighlightKey = '';
         // A (re)loaded webview has no content, whatever was posted to its predecessor.
         this.posted = undefined;
+        this.baselineSync.forget();
         await this.sendConfig();
         // Render even if hidden (e.g. restored in a background tab): this is the webview's first content, and it
         // keeps `lastRender` fresh for the scroll/highlight messages below.
@@ -391,6 +407,14 @@ export class PreviewPanel implements vscode.Disposable {
         if (editor && this.manager.settings.searchSyncSelection) this.highlightSelection(editor);
         break;
       }
+      case 'needBaseline':
+        // The webview cited a baseline it does not hold (safety net; it asks once per id). Send the render again,
+        // this time with the HTML, even though its inputs are unchanged.
+        if (this.baselineSync.missing(m.id)) {
+          this.posted = undefined;
+          await this.render();
+        }
+        break;
       case 'revealLine':
         if (Date.now() >= this.ignorePreviewScrollUntil) this.manager.revealSourceLine(this.document.uri, m.line);
         break;

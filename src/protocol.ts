@@ -78,8 +78,17 @@ export type BlockChange =
 
 /** Changes of the rendered document against its git index version. */
 export interface DocChanges {
-  /** The original version rendered like the current one (same `data-line` stamping). */
-  originalHtml: string;
+  /**
+   * Identifies the rendered original; it changes exactly when `originalHtml` would (per preview, never
+   * reused), so a webview that already holds this baseline needs no new copy.
+   */
+  baselineId: number;
+  /**
+   * The original version rendered like the current one (same `data-line` stamping). Only sent when the
+   * webview does not have `baselineId` yet; the webview caches it and asks again (`needBaseline`) if it
+   * ever meets an id it does not have.
+   */
+  originalHtml?: string;
   ops: BlockChange[];
 }
 
@@ -136,6 +145,8 @@ export type EditError = 'stale' | 'readonly' | 'invalid' | 'failed';
 
 export type FromWebview =
   | { type: 'ready' }
+  /** A `render` cited baseline `id` without `originalHtml` and the webview does not have it: send the render again with it. */
+  | { type: 'needBaseline'; id: number }
   | { type: 'revealLine'; line: number }
   | { type: 'openLink'; href: string }
   | { type: 'updateSetting'; key: QuickSettingKey; value: unknown }

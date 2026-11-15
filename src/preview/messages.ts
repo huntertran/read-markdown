@@ -20,6 +20,7 @@ const optional = (v: unknown, check: (x: unknown) => boolean): boolean => v === 
  */
 const validators: { [K in FromWebview['type']]: (m: Fields) => boolean } = {
   ready: () => true,
+  needBaseline: (m) => isIndex(m.id),
   revealLine: (m) => isLinePosition(m.line),
   openLink: (m) => isString(m.href),
   // Shape only: `validateQuickSetting` decides which keys and values are allowed.

@@ -6,6 +6,10 @@ import { describeMessage, isRestorableScheme, parseFromWebview, uriScheme } from
 /** One valid sample per `FromWebview` member; the mapped type fails to compile if one is missing. */
 const VALID: { [K in FromWebview['type']]: Extract<FromWebview, { type: K }>[] } = {
   ready: [{ type: 'ready' }],
+  needBaseline: [
+    { type: 'needBaseline', id: 0 },
+    { type: 'needBaseline', id: 7 },
+  ],
   revealLine: [
     { type: 'revealLine', line: 0 },
     { type: 'revealLine', line: 12.5 },
@@ -68,6 +72,10 @@ describe('parseFromWebview: invalid input', () => {
 
   it('rejects wrong field types and missing fields', () => {
     const bad: unknown[] = [
+      { type: 'needBaseline' },
+      { type: 'needBaseline', id: '1' },
+      { type: 'needBaseline', id: -1 },
+      { type: 'needBaseline', id: 1.5 },
       { type: 'revealLine' },
       { type: 'revealLine', line: '3' },
       { type: 'openLink' },
