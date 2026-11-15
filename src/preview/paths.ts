@@ -43,17 +43,17 @@ export type Reference =
   /** Any other scheme (`command:`, `vscode:`, `javascript:`, a Windows drive `C:`…): deliberately not opened. */
   | { kind: 'unsupported'; scheme: string }
   | {
-      kind: 'local';
-      scheme: string;
-      authority: string;
-      /** Normalised (`.`/`..` resolved after percent-decoding). */
-      path: string;
-      /** Percent-decoded, without the leading `?` / `#`; empty when absent. */
-      query: string;
-      fragment: string;
-      /** The target lies in `allowedRoots(context)` (the root itself counts). */
-      inside: boolean;
-    }
+    kind: 'local';
+    scheme: string;
+    authority: string;
+    /** Normalized (`.`/`..` resolved after percent-decoding). */
+    path: string;
+    /** Percent-decoded, without the leading `?` / `#`; empty when absent. */
+    query: string;
+    fragment: string;
+    /** The target lies in `allowedRoots(context)` (the root itself counts). */
+    inside: boolean;
+  }
   | { kind: 'invalid'; reason: 'empty' | 'no-base' };
 
 export const EXTERNAL_SCHEMES: ReadonlySet<string> = new Set(['http', 'https', 'mailto']);
@@ -68,7 +68,7 @@ export function hostPathFlags(): { windows: boolean; caseInsensitive: boolean } 
 
 /**
  * Resolves `ref` (a link `href` or an image `src`, as written) in `context`. Percent-decoding happens once and
- * before the path is normalised, so `..%2F` traverses like `../`. A malformed escape keeps the raw path (and the
+ * before the path is normalized, so `..%2F` traverses like `../`. A malformed escape keeps the raw path (and the
  * raw fragment) instead of throwing.
  */
 export function resolveReference(ref: string, context: PathContext): Reference {
@@ -77,6 +77,8 @@ export function resolveReference(ref: string, context: PathContext): Reference {
   if (schemeMatch) {
     const scheme = schemeMatch[1].toLowerCase();
     if (EXTERNAL_SCHEMES.has(scheme)) return { kind: 'external', scheme };
+    // Defense in depth: the preview never sends a `file:` link here (markdown-it's `validateLink` rejects the
+    // scheme and the webview sanitizer strips such an `href`), but another caller is still classified correctly.
     if (scheme === 'file') return withInside(parseFileUri(ref), context);
     return { kind: 'unsupported', scheme };
   }
@@ -107,7 +109,7 @@ export function allowedRoots(context: PathContext): UriParts[] {
   return roots;
 }
 
-/** True if `target` is one of `roots` or lies below one. Paths are normalised first; `/a/b` does not contain `/a/bc`. */
+/** True if `target` is one of `roots` or lies below one. Paths are normalized first; `/a/b` does not contain `/a/bc`. */
 export function isInsideRoots(target: UriParts, roots: readonly UriParts[], context: Pick<PathContext, 'caseInsensitive' | 'windows'> = {}): boolean {
   const key = (p: UriParts): string | undefined => comparable(p, context.caseInsensitive ?? context.windows ?? false);
   const t = key(target);
@@ -132,7 +134,7 @@ function withInside(local: Omit<Local, 'inside'>, context: PathContext): Local {
   return { ...local, inside: isInsideRoots(local, allowedRoots(context), context) };
 }
 
-/** Path comparison key: normalised, no trailing slash (the root `/` becomes ''), drive letter folded. */
+/** Path comparison key: normalized, no trailing slash (the root `/` becomes ''), drive letter folded. */
 function comparable(p: UriParts, caseInsensitive: boolean): string {
   let norm = path.posix.normalize(p.path || '/');
   if (norm.length > 1 && norm.endsWith('/')) norm = norm.slice(0, -1);

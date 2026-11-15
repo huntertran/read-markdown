@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Security: links to local files outside the workspace folders and the document's folder now ask for confirmation before opening, and nothing is read from the target until you confirm (this matters for network paths like `\\host\share`). Links to `file:` URIs reveal the `#heading` like other links, and malformed link fragments no longer fail.
+- Security: links to local files outside the workspace folders and the document's folder now ask for confirmation before opening, and nothing is read from the target until you confirm (this matters for network paths like `\\host\share`). Malformed link fragments no longer fail.
 - Security: the preview no longer loads remote stylesheets or fonts. A document's `<style>` or `style`
   attribute, and your own custom CSS (`readMarkdown.customCss.*`), can no longer `@import url(https://…)`
   or use a remote `@font-face`; such CSS requested the file from the network, which revealed your IP
