@@ -497,6 +497,27 @@ describe('GitBaseline', () => {
       assert.equal(s.repo.shows.length, 3, 'first read, refresh, read after the reset; none since');
     });
 
+    it('refreshes once more when the state changes during a refresh, so the newest content wins', async () => {
+      const s = await connected();
+      await s.baseline.getOriginal(A);
+      const read = s.repo.holdNext();
+      s.repo.stateChange.fire(); // reads a2 (held)
+      s.repo.index.set(A.fsPath, 'a3');
+      s.repo.stateChange.fire(); // the index moved on while the first refresh is reading
+      s.repo.stateChange.fire();
+      await flush();
+      assert.equal(s.repo.shows.length, 2, 'no second read while one is in flight');
+      read.resolve('a2');
+      await flush();
+      assert.deepEqual(s.changes, ['file:///ws/a.md', 'file:///ws/a.md'], 'a1 -> a2, then a2 -> a3');
+      assert.equal(await s.baseline.getOriginal(A), 'a3');
+      assert.equal(s.repo.shows.length, 3, 'the burst of state changes is one extra refresh');
+      s.repo.index.set(A.fsPath, 'a4');
+      s.repo.stateChange.fire();
+      await flush();
+      assert.equal(await s.baseline.getOriginal(A), 'a4', 'a later state change refreshes as usual');
+    });
+
     it('does not re-read files of a repository after their baselines were reset', async () => {
       const s = await connected();
       await s.baseline.getOriginal(A);

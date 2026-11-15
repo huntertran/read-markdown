@@ -65,6 +65,8 @@ export class GitBaseline implements vscode.Disposable {
   private apiListeners: vscode.Disposable[] = [];
   private api: GitApi | undefined;
   private connecting = false;
+  /** Repositories with a refresh in flight; `again` = their state changed meanwhile. */
+  private readonly refreshing = new Map<GitRepository, { again: boolean }>();
 
   constructor(private readonly ports: GitBaselinePorts) {
     this.emitter = ports.createEmitter();
@@ -169,7 +171,30 @@ export class GitBaseline implements vscode.Disposable {
     if (this.watched.has(repo)) return;
     // Fires on stage / unstage / commit / checkout, but also on every status refresh (e.g. a save):
     // only report files whose index content really changed.
-    this.watched.set(repo, repo.state.onDidChange(() => void this.refresh(repo)));
+    this.watched.set(repo, repo.state.onDidChange(() => void this.refreshSoon(repo)));
+  }
+
+  /**
+   * One refresh per repository at a time: a state change during a refresh runs it once more afterwards.
+   * Two overlapping refreshes would both start from the same entry, and the later (newer) read would be
+   * dropped by the stale-entry guard, leaving the older content cached.
+   */
+  private async refreshSoon(repo: GitRepository): Promise<void> {
+    const running = this.refreshing.get(repo);
+    if (running) {
+      running.again = true;
+      return;
+    }
+    const state = { again: false };
+    this.refreshing.set(repo, state);
+    try {
+      do {
+        state.again = false;
+        await this.refresh(repo);
+      } while (state.again);
+    } finally {
+      this.refreshing.delete(repo);
+    }
   }
 
   private async refresh(repo: GitRepository): Promise<void> {
