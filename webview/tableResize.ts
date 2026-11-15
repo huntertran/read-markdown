@@ -69,7 +69,7 @@ function cellText(cell: Element): string {
   return text.trim().replace(/\s+/g, ' ');
 }
 
-function tableKeys(tables: HTMLTableElement[]): string[] {
+export function tableKeys(tables: HTMLTableElement[]): string[] {
   const seen = new Map<string, number>();
   return tables.map((t) => {
     const header = t.rows[0] ? [...t.rows[0].cells].map(cellText).join('␟') : '';
