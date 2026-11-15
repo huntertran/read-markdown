@@ -52,7 +52,7 @@ const ALLOWED_ATTR = [
   // Task-list checkboxes
   'checked', 'disabled',
   // The renderer's own attributes (see src/render/markdown.ts)
-  'data-line', 'data-line-end', 'data-item-end', 'data-task', 'data-href', 'data-lang',
+  'data-line', 'data-line-end', 'data-item-end', 'data-task', 'data-href', 'data-lang', 'data-rm-html',
   // SVG
   'xmlns', 'viewbox', 'preserveaspectratio', 'x', 'y', 'x1', 'x2', 'y1', 'y2', 'cx', 'cy', 'r', 'rx', 'ry', 'fx', 'fy', 'd', 'points',
   'dx', 'dy', 'transform', 'opacity', 'visibility', 'display', 'overflow', 'vector-effect',

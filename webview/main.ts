@@ -194,10 +194,18 @@ function toggleChanges(): void {
   if (lastRender) renderContent(lastRender);
 }
 
-/** Tags each top-level block so the preview's context menu (Edit Block, Show Source) knows its line. */
+/**
+ * Tags each top-level block so the preview's context menu (Edit Block, Show Source) knows its line.
+ * `rmHtml` hides Edit Block for raw HTML blocks. It is always set (also `false`): VS Code merges the
+ * context of the clicked element's ancestors, and a Markdown block can sit inside an unclosed raw `<div>`.
+ */
 function stampMenuContext(): void {
   for (const block of content.querySelectorAll<HTMLElement>('[data-line-end]')) {
-    block.dataset.vscodeContext = JSON.stringify({ webviewSection: 'rm-block', rmLine: Number(block.dataset.line) });
+    block.dataset.vscodeContext = JSON.stringify({
+      webviewSection: 'rm-block',
+      rmLine: Number(block.dataset.line),
+      rmHtml: block.hasAttribute('data-rm-html'),
+    });
   }
 }
 

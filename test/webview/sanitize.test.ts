@@ -382,6 +382,12 @@ describe('sanitize', () => {
       assert.equal(frag.querySelectorAll('p').length >= 1, true);
     });
 
+    it('keeps data-rm-html (the renderer flag of a raw HTML block) and no other data-rm-* attribute', () => {
+      const el = one(clean('<div data-line="2" data-line-end="3" data-rm-html="" data-rm-config="x" data-rm-del-before="" data-rm-other="1">t</div>'), 'div');
+      assert.deepEqual([...el.attributes].map((at) => at.name).sort(), ['data-line', 'data-line-end', 'data-rm-html']);
+      assert.equal(one(clean('<svg data-rm-html="" width="1"><circle r="1"/></svg>'), 'svg').hasAttribute('data-rm-html'), true);
+    });
+
     it('drops unknown data-* attributes but keeps aria-* and role', () => {
       const el = one(clean('<p data-move-id="1" data-rm-config="x" data-slug="s" data-custom="c" aria-label="l" aria-hidden="true" role="note">t</p>'), 'p');
       assert.deepEqual(

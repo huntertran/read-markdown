@@ -205,8 +205,9 @@ describe('markdown renderer', () => {
     it('drops line attributes from author HTML and keeps the real ones', () => {
       const r = render('before\n\n<div data-line="0" data-line-end="999" class="x">forged</div>\n\n- a\n- b\n\nafter\n', opts);
       assert.doesNotMatch(r.html, /data-line-end="999"/);
-      assert.doesNotMatch(r.html, /<div[^>]*data-line/);
-      assert.match(r.html, /<div class="x">forged<\/div>/);
+      assert.doesNotMatch(r.html, /data-line="0" data-line-end="999"/);
+      // The author's values are gone; the renderer stamps the real ones on the block's first tag.
+      assert.match(r.html, /<div data-line="2" data-line-end="3" data-rm-html="" class="x">forged<\/div>/);
       assert.match(r.html, /<p data-line="0" data-line-end="1">before<\/p>/);
       assert.match(r.html, /<ul data-line="4" data-line-end="7">/);
       assert.match(r.html, /<li data-line="4" data-item-end="5">/);
@@ -245,8 +246,72 @@ describe('markdown renderer', () => {
 
     it('does not let an unterminated tag swallow the real attributes of the next block', () => {
       const r = render('<div title="x"\n\ntext\n', opts);
-      assert.match(r.html, /<div title="x"\n>/);
+      assert.match(r.html, /<div data-line="0" data-line-end="1" data-rm-html="" title="x"\n>/);
       assert.match(r.html, /<p data-line="2" data-line-end="3">text<\/p>/);
+    });
+  });
+
+  describe('raw HTML blocks carry line attributes for track changes', () => {
+    const count = (html: string, attr: string) => html.split(` ${attr}`).length - 1;
+
+    it('stamps the first tag of a top-level block with data-line, data-line-end and data-rm-html', () => {
+      const r = render('text\n\n<div class="a">old</div>\n\nafter\n', opts);
+      assert.match(r.html, /<div data-line="2" data-line-end="3" data-rm-html="" class="a">old<\/div>/);
+      assert.deepEqual(r.topBlocks.map((b) => [b.line, b.end, b.kind]), [[0, 1, 'paragraph_open'], [2, 3, 'html_block'], [4, 5, 'paragraph_open']]);
+    });
+
+    it('stamps a nested block with data-line only', () => {
+      const r = render('> <div>quoted</div>\n', opts);
+      assert.match(r.html, /<div data-line="0" data-rm-html="">quoted<\/div>/);
+      assert.equal(count(r.html, 'data-line-end'), 1); // the blockquote's
+      assert.match(r.html, /<blockquote data-line="0" data-line-end="1">/);
+    });
+
+    it('replaces author-written values, leaving one of each attribute with the real value', () => {
+      const r = render('a\n\n<div data-line="99" data-line-end="100" data-rm-html class="x" DATA-RM-HTML="1">forged</div>\n', opts);
+      const tag = /<div[^>]*>/.exec(r.html)?.[0] ?? '';
+      assert.equal(tag, '<div data-line="2" data-line-end="3" data-rm-html="" class="x">');
+      assert.doesNotMatch(r.html, /99|100/);
+    });
+
+    it('handles the usual tag forms', () => {
+      const cases: [string, RegExp][] = [
+        ['<img src=x>\n', /^<img data-line="0" data-line-end="1" data-rm-html="" src=x>/],
+        ['<br/>\n', /^<br data-line="0" data-line-end="1" data-rm-html=""\/>/],
+        // (An `<svg` whose tag continues on the next line is not an HTML block in CommonMark, so the tag ends on the first line here.)
+        ['<svg viewBox="0 0 1 1">\n<path d="M0 0"/>\n</svg>\n', /^<svg data-line="0" data-line-end="3" data-rm-html="" viewBox="0 0 1 1">/],
+        ['<DIV>x</DIV>\n', /^<DIV data-line="0" data-line-end="1" data-rm-html="">x<\/DIV>/],
+        ['   <div>x</div>\n', /^ {3}<div data-line="0" data-line-end="1" data-rm-html="">x<\/div>/],
+        ['<details><summary>s</summary>b</details>\n', /^<details data-line="0" data-line-end="1" data-rm-html="">/],
+      ];
+      for (const [src, expected] of cases) assert.match(render(src, opts).html, expected, src);
+    });
+
+    it('stamps only the first element of a block with several roots', () => {
+      const r = render('<div>a</div><div>b</div>\n', opts);
+      assert.equal(count(r.html, 'data-rm-html'), 1);
+      assert.match(r.html, /^<div data-line="0" data-line-end="1" data-rm-html="">a<\/div><div>b<\/div>/);
+    });
+
+    it('does not stamp comments, closing tags, script or style blocks', () => {
+      const cases = ['<!-- note -->\n', '<?php x ?>\n', '<!DOCTYPE html>\n', '<script>var a = 1;</script>\n', '<SCRIPT>x</SCRIPT>\n', '<style>p { color: red }</style>\n', '<Style>p{}</Style>\n'];
+      for (const src of cases) {
+        const r = render(src, opts);
+        assert.doesNotMatch(r.html, /data-rm-html/, src);
+        assert.doesNotMatch(r.html, /data-line/, src);
+      }
+    });
+
+    it('leaves the closing block of a split <div> unmarked and the middle Markdown block as before', () => {
+      const r = render('<div>\n\nmiddle\n\n</div>\n', opts);
+      assert.match(r.html, /^<div data-line="0" data-line-end="1" data-rm-html="">\n<p data-line="2" data-line-end="3">middle<\/p>\n<\/div>\n$/);
+      assert.equal(count(r.html, 'data-rm-html'), 1);
+    });
+
+    it('keeps the output well formed when the first tag is unterminated', () => {
+      const r = render('<div class="a\n\nnext\n', opts);
+      assert.match(r.html, /^<div data-line="0" data-line-end="1" data-rm-html="" class="a\n">/);
+      assert.match(r.html, /<p data-line="2" data-line-end="3">next<\/p>/);
     });
   });
 });

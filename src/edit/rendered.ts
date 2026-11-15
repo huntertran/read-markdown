@@ -21,7 +21,9 @@ export interface ListRange {
 
 /**
  * True if [start, end) is exactly one top-level block the renderer marked with `data-line-end`.
- * Raw HTML blocks are not: they render without line attributes, so the preview cannot edit them.
+ * Raw HTML blocks are never editable, although their first element carries the line attributes: only
+ * that first element does (a block may have several roots), and a block may be unbalanced HTML that
+ * does not map to one element.
  */
 export function isRenderedBlock(blocks: readonly BlockRange[], start: unknown, end: unknown): boolean {
   if (!Number.isInteger(start) || !Number.isInteger(end)) return false;

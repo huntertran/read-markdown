@@ -111,7 +111,7 @@
       "webview/context": [
         {
           "command": "readMarkdown.editBlock",
-          "when": "webviewSection == 'rm-block' && rmEditable",
+          "when": "webviewSection == 'rm-block' && rmEditable && !rmHtml",
           "group": "1_readMarkdown@1"
         },
         {

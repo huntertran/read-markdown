@@ -45,7 +45,9 @@ export function indexBaseline(originalHtml: string): Baseline {
   const blocks = new Map<number, HTMLElement>();
   // (`:scope` matches nothing on a DocumentFragment, so walk its children.)
   for (const el of sanitize(originalHtml).children) {
-    if (el instanceof HTMLElement && el.dataset.lineEnd !== undefined) blocks.set(Number(el.dataset.line), el);
+    // Not `instanceof HTMLElement`: a raw `<svg>` block is an SVGElement (which has `dataset` too).
+    const block = el as HTMLElement;
+    if (block.dataset?.lineEnd !== undefined) blocks.set(Number(block.dataset.line), block);
   }
   return blocks;
 }

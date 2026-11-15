@@ -1,5 +1,5 @@
 import * as assert from 'node:assert/strict';
-import { RESERVED_ATTRIBUTES, neutralizeReservedAttributes as clean } from '../../src/render/rawHtml';
+import { RESERVED_ATTRIBUTES, neutralizeReservedAttributes as clean, stampRawHtmlBlock } from '../../src/render/rawHtml';
 
 /** True if `html` still has `name` as an attribute name (preceded by a separator, followed by one). */
 function hasAttr(html: string, name: string): boolean {
@@ -124,5 +124,70 @@ describe('neutralizeReservedAttributes', () => {
       const once = clean(html);
       assert.equal(clean(once), once, html);
     }
+  });
+});
+
+describe('stampRawHtmlBlock', () => {
+  const ATTRS = ' data-line="3" data-line-end="5"';
+  const STAMP = `${ATTRS} data-rm-html=""`;
+
+  it('inserts the attributes directly after the name of the first opening tag', () => {
+    assert.equal(stampRawHtmlBlock('<div class="a">x</div>\n', ATTRS), `<div${STAMP} class="a">x</div>\n`);
+    assert.equal(stampRawHtmlBlock('<img src=x>\n', ATTRS), `<img${STAMP} src=x>\n`);
+    assert.equal(stampRawHtmlBlock('<br/>\n', ATTRS), `<br${STAMP}/>\n`);
+    assert.equal(stampRawHtmlBlock('<svg\n viewBox="0 0 1 1">', ATTRS), `<svg${STAMP}\n viewBox="0 0 1 1">`);
+    assert.equal(stampRawHtmlBlock('<DIV>x</DIV>', ATTRS), `<DIV${STAMP}>x</DIV>`);
+    assert.equal(stampRawHtmlBlock('   <p>x</p>', ATTRS), `   <p${STAMP}>x</p>`);
+    assert.equal(stampRawHtmlBlock('<my-element>x</my-element>', ATTRS), `<my-element${STAMP}>x</my-element>`);
+  });
+
+  it('stamps only the first tag', () => {
+    const out = stampRawHtmlBlock('<div>a</div><div>b</div>', ATTRS);
+    assert.equal(out, `<div${STAMP}>a</div><div>b</div>`);
+  });
+
+  it('stamps data-line only when the token has no end line', () => {
+    assert.equal(stampRawHtmlBlock('<div>x</div>', ' data-line="3"'), '<div data-line="3" data-rm-html="">x</div>');
+  });
+
+  it('leaves blocks without an opening tag unchanged', () => {
+    for (const html of [
+      '<!-- c -->\n',
+      '  <!-- c --><div>x</div>',
+      '</div>\n',
+      '<?php echo 1; ?>',
+      '<!DOCTYPE html>',
+      '<![CDATA[ x ]]>',
+      '< div>x</div>',
+      '<1a>x',
+      'text <div>x</div>',
+      '',
+    ]) {
+      assert.equal(stampRawHtmlBlock(html, ATTRS), html);
+    }
+  });
+
+  it('leaves script and style blocks unchanged, whatever the case', () => {
+    for (const html of ['<script>a</script>', '<SCRIPT src=x></SCRIPT>', '<style>p{}</style>', '<Style\n>p{}</Style>', ' <script\n>']) {
+      assert.equal(stampRawHtmlBlock(html, ATTRS), html);
+    }
+    // Only the exact names: these are ordinary elements.
+    assert.match(stampRawHtmlBlock('<scripty>x</scripty>', ATTRS), /data-rm-html/);
+  });
+
+  it('stamps nothing without line attributes', () => {
+    assert.equal(stampRawHtmlBlock('<div>x</div>', ''), '<div>x</div>');
+  });
+
+  it('removes author-written data-rm-html (any form) before the renderer adds its own', () => {
+    for (const author of ['<div data-rm-html>x</div>', '<div data-rm-html="">x</div>', '<div DATA-RM-HTML=1>x</div>', "<div data-rm-html='a'>x</div>"]) {
+      assert.equal(clean(author), '<div>x</div>', author);
+      assert.equal(stampRawHtmlBlock(clean(author), ATTRS), `<div${STAMP}>x</div>`, author);
+    }
+  });
+
+  it('combines with an unterminated first tag into well formed output', () => {
+    assert.equal(stampRawHtmlBlock(clean('<div class="a\n'), ATTRS), `<div${STAMP} class="a\n">`);
+    assert.equal(stampRawHtmlBlock(clean('<div'), ATTRS), `<div${STAMP}>`);
   });
 });

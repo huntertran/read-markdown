@@ -7,7 +7,7 @@ import type { ListRange } from '../edit/rendered';
 import type { Heading } from '../protocol';
 import { createCachedHighlighter } from './highlightCache';
 import { Slugger, headingText } from './headings';
-import { neutralizeReservedAttributes } from './rawHtml';
+import { neutralizeReservedAttributes, stampRawHtmlBlock } from './rawHtml';
 
 export interface RenderOptions {
   /** Render ```mermaid fences as diagram placeholders. */
@@ -208,8 +208,10 @@ export function createMarkdownRenderer(): (source: string, options: RenderOption
   // Raw HTML from the document must not carry the attributes the renderer and webview trust (see rawHtml.ts).
   // The renderer's own markup (line attributes, task checkboxes, alerts, ...) does not use these rules.
   const defaultHtmlBlock = md.renderer.rules.html_block ?? ((tokens, idx) => tokens[idx].content);
+  // A block's first tag is stamped with its line attributes AFTER neutralizing (never before: the renderer's own
+  // attributes must not pass through the filter), so track changes can find the element.
   md.renderer.rules.html_block = (tokens, idx, options, rawEnv, self) =>
-    neutralizeReservedAttributes(defaultHtmlBlock(tokens, idx, options, rawEnv, self));
+    stampRawHtmlBlock(neutralizeReservedAttributes(defaultHtmlBlock(tokens, idx, options, rawEnv, self)), lineAttrs(tokens[idx]));
   const defaultHtmlInline = md.renderer.rules.html_inline ?? ((tokens, idx) => tokens[idx].content);
   md.renderer.rules.html_inline = (tokens, idx, options, rawEnv, self) =>
     neutralizeReservedAttributes(defaultHtmlInline(tokens, idx, options, rawEnv, self));

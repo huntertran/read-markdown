@@ -32,7 +32,7 @@ describe('isRenderedBlock', () => {
     assert.equal(isRenderedBlock(blocks, -1, 3), false);
   });
 
-  it('rejects raw HTML blocks, which have no data-line-end in the preview', () => {
+  it('rejects raw HTML blocks, which the preview never edits in place', () => {
     assert.equal(isRenderedBlock(blocks, 9, 10), false);
   });
 

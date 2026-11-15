@@ -143,6 +143,35 @@ function stripTags(html: string): string {
   return out + html.slice(copyFrom) + closer;
 }
 
+/** An opening tag at the start of a block: optional indentation, `<`, tag name (ASCII letter first). */
+const OPENING_TAG = /^([ \t]*<)([a-zA-Z][^\s/>]*)/;
+
+/** Attribute the renderer adds next to the line attributes of a raw HTML block (no value). */
+export const RAW_HTML_ATTRIBUTE = 'data-rm-html';
+
+/**
+ * Puts the renderer's line attributes (`lineAttrs`, e.g. ` data-line="3" data-line-end="5"`) and the
+ * flag `data-rm-html` into the FIRST opening tag of a raw HTML block, so track changes (and scroll
+ * sync) can find the block's element. `html` must already have gone through
+ * `neutralizeReservedAttributes`: that removes author-written copies of these attributes, and the
+ * renderer's own must be added afterwards, never passed through it.
+ *
+ * Known limits (accepted): a block with several root elements is represented by its first element
+ * only. A block whose first thing is a comment, a closing tag (the rest of a `<div>` + blank line +
+ * Markdown + blank line + `</div>` split), `<?`, `<!` or a `script` / `style` element is left
+ * unmarked, so changes to it show no mark. If the sanitizer later drops the first element, the block
+ * is unmarked too. No wrapper element is added, so author layout is unchanged.
+ */
+export function stampRawHtmlBlock(html: string, lineAttrs: string): string {
+  if (!lineAttrs) return html;
+  const m = OPENING_TAG.exec(html);
+  if (!m) return html;
+  const name = m[2].toLowerCase();
+  if (name === 'script' || name === 'style') return html;
+  const at = m[0].length;
+  return `${html.slice(0, at)}${lineAttrs} ${RAW_HTML_ATTRIBUTE}=""${html.slice(at)}`;
+}
+
 /**
  * Returns `html` without reserved attributes (see the file comment). `html` is the content of one
  * markdown-it `html_block` or `html_inline` token; the renderer's own markup never goes through here.

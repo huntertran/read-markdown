@@ -365,8 +365,8 @@ describe('changes (webview)', () => {
 
   describe('opaque blocks', () => {
     // `OPAQUE` = .rm-mermaid, hr, img, video, iframe, svg: no word diff, shown as removed + added.
-    // Through the real renderer these reach `diffBlock` as a modify only when they sit directly in a
-    // blockquote (raw HTML there is not a stamped top-level block) or, for Mermaid, at top level.
+    // Through the real renderer these reach `diffBlock` as a modify when they sit directly in a
+    // blockquote, at top level as a raw HTML block (see 'raw HTML blocks') or, for Mermaid, as a fence.
     // An `iframe` is dropped by the sanitizer, so it never reaches the diff.
     const mermaid = (edge: string) => `\`\`\`mermaid\ngraph TD\n${edge}\n\`\`\`\n`;
 
@@ -1046,6 +1046,111 @@ describe('changes (webview)', () => {
     it('does not mix up blocks nested in other blocks with top-level ones', () => {
       const { root } = run('> quoted original\n\npara\n', '> quoted original\n\npara\n\nnew para\n', 'inline');
       assert.equal(only(root, '.rm-chg-ins').textContent, 'new para');
+    });
+  });
+
+  describe('raw HTML blocks', () => {
+    const doc = (...blocks: string[]) => ['Intro text here.', ...blocks, 'Outro text here.'].join('\n\n') + '\n';
+    const IMG_A = '<img src="images/screenshot-settings-one.png" alt="Screenshot of the settings panel">';
+    const IMG_B = '<img src="images/screenshot-settings-two.png" alt="Screenshot of the settings panel">';
+    const SVG = (r: string) =>
+      `<svg width="10" height="10" viewBox="0 0 10 10">\n<circle cx="5" cy="5" r="${r}"/>\n<text x="1" y="9">chart label text</text>\n</svg>`;
+
+    it('keeps the line attributes and the data-rm-html flag through the sanitizer', () => {
+      const { root } = run(doc('<div>a</div>'), doc('<div>a</div>'), 'inline');
+      const div = only(root, 'div');
+      assert.equal(div.dataset.line, '2');
+      assert.equal(div.dataset.lineEnd, '3');
+      assert.equal(div.hasAttribute('data-rm-html'), true);
+    });
+
+    for (const mode of ['inline', 'gutter'] as const) {
+      it(`marks changed text of a <div> (${mode})`, () => {
+        const before = '<div>old words here and some more words</div>';
+        const after = '<div>new words here and some more words</div>';
+        const { root, ops } = run(doc(before), doc(after), mode);
+        assert.deepEqual(ops, [{ op: 'modify', oldLine: 2, line: 2 }]);
+        const div = only(root, 'div');
+        assert.ok(div.classList.contains('rm-chg-mod'));
+        assert.equal(q(root, CHANGED_SELECTOR).length, 1);
+        if (mode === 'inline') {
+          assert.equal(newText(div), 'new words here and some more words');
+          assert.equal(oldText(div), 'old words here and some more words');
+          assert.ok(q(div, 'ins.rm-ins').length >= 1 && q(div, 'del.rm-del').length >= 1);
+        } else {
+          assert.equal(div.textContent, 'new words here and some more words');
+          assert.equal(q(root, 'ins, del').length, 0);
+        }
+      });
+
+      it(`tags an added raw <img> block rm-chg-ins (${mode})`, () => {
+        const { root, ops } = run(doc(), doc(IMG_A), mode);
+        assert.deepEqual(ops, [{ op: 'ins', line: 2 }]);
+        const img = only(root, 'img');
+        assert.ok(img.classList.contains('rm-chg-ins'));
+        assert.equal(img.dataset.line, '2');
+        assert.equal(q(root, CHANGED_SELECTOR).length, 1);
+      });
+    }
+
+    it('shows a removed raw block as a stripped clone (inline)', () => {
+      const { root, ops } = run(doc('<div class="note">gone block</div>'), doc(), 'inline');
+      assert.deepEqual(ops, [{ op: 'del', oldLine: 2, before: 2 }]);
+      const clone = only(root, '.rm-chg-del');
+      assert.equal(clone.localName, 'div');
+      assert.equal(clone.textContent, 'gone block');
+      assertStripped(clone);
+      assert.equal(clone.nextElementSibling?.textContent, 'Outro text here.');
+      assert.equal(q(root, '[data-line-end]').length, 2, 'only the two paragraphs are live blocks');
+    });
+
+    it('marks the block after a removed raw block with data-rm-del-before (gutter)', () => {
+      const { root } = run(doc('<div class="note">gone block</div>'), doc(), 'gutter');
+      assert.equal(q(root, REMOVED_SELECTOR).length, 0);
+      assert.equal(q(root, 'div').length, 0);
+      assert.equal(only(root, '[data-rm-del-before]').textContent, 'Outro text here.');
+      assert.equal(q(root, CHANGED_SELECTOR).length, 0);
+    });
+
+    const opaque = [
+      { tag: 'img', before: IMG_A, after: IMG_B },
+      { tag: 'svg', before: SVG('3'), after: SVG('5') },
+    ];
+    for (const c of opaque) {
+      it(`inline: shows a changed raw <${c.tag}> as a removed clone and an added element`, () => {
+        const { root, ops } = run(doc(c.before), doc(c.after), 'inline');
+        assert.deepEqual(ops.map((o) => o.op), ['modify'], 'the host reports a modification');
+        const removed = only(root, '.rm-chg-del');
+        const added = only(root, '.rm-chg-ins');
+        assert.equal(removed.localName, c.tag);
+        assert.equal(added.localName, c.tag);
+        assert.equal(removed.nextElementSibling, added);
+        assert.equal(removed.getAttribute('aria-label'), 'Removed');
+        assertStripped(removed);
+        assert.equal(added.dataset.line, '2');
+        assert.equal(q(root, CHANGED_SELECTOR).length, 2);
+        assert.equal(q(root, 'ins, del').length, 0);
+      });
+
+      it(`gutter: tags a changed raw <${c.tag}> as modified without a clone`, () => {
+        const { root } = run(doc(c.before), doc(c.after), 'gutter');
+        const mod = only(root, '.rm-chg-mod');
+        assert.equal(mod.localName, c.tag);
+        assert.equal(q(root, CHANGED_SELECTOR).length, 1);
+        assert.equal(q(root, REMOVED_SELECTOR).length, 0);
+      });
+    }
+
+    it('leaves a raw block that starts with a comment unmarked (accepted limit)', () => {
+      // (One block: the comment ends on its own line only if `-->` is there, so the div shares the line.)
+      const { root } = run(doc('<!-- a --><div>old</div>'), doc('<!-- a --><div>new</div>'), 'inline');
+      assert.equal(q(root, CHANGED_SELECTOR).length, 0);
+      assert.equal(q(root, '[data-rm-html]').length, 0);
+    });
+
+    it('marks a raw block that follows a comment block on its own line', () => {
+      const { root } = run(doc('<!-- a -->\n<div>old words here and some more words</div>'), doc('<!-- a -->\n<div>new words here and some more words</div>'), 'inline');
+      assert.ok(only(root, 'div').classList.contains('rm-chg-mod'));
     });
   });
 });

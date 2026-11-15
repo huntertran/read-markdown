@@ -184,6 +184,8 @@ export interface BlockMenuContext {
   webviewSection?: 'rm-block';
   /** 0-based source line where the block starts. */
   rmLine?: number;
+  /** The block is raw HTML from the document: it cannot be edited in place (Show Source still works). */
+  rmHtml?: boolean;
   rmEditable?: boolean;
 }
 

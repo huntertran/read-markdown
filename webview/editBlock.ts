@@ -61,7 +61,7 @@ export function initBlockEdit(options: Options): void {
     label: 'Edit this block',
     icon: '✎',
     placement: 'rail',
-    when: () => enabled && !session,
+    when: (block) => enabled && !session && !isRawHtml(block),
     run: startEdit,
   });
 
@@ -91,7 +91,7 @@ export function initBlockEdit(options: Options): void {
     // Links and controls keep their own double-click behaviour.
     if (target.closest('a, button, input, summary, .rm-edit')) return;
     const block = findBlock(target);
-    if (!block) return;
+    if (!block || isRawHtml(block)) return;
     window.getSelection()?.removeAllRanges();
     startEdit(block);
   });
@@ -143,6 +143,14 @@ export function onTaskResult(msg: Extract<ToWebview, { type: 'taskResult' }>): v
   flash(task.input.closest<HTMLElement>('[data-line-end]') ?? task.input, OPEN_MESSAGES[msg.error ?? 'failed']);
 }
 
+/**
+ * A raw HTML block (the renderer flags its first element with `data-rm-html`): it carries line
+ * attributes for track changes and scroll sync, but is never edited in place (the host rejects it too).
+ */
+function isRawHtml(block: Element): boolean {
+  return block.hasAttribute('data-rm-html');
+}
+
 function findBlock(target: Element): HTMLElement | undefined {
   const block = target.closest<HTMLElement>('[data-line-end]');
   if (!block || !opts.content.contains(block) || block.closest('.rm-edit')) return undefined;
@@ -170,6 +178,7 @@ function startEdit(block: HTMLElement): void {
     session.textarea.focus();
     return;
   }
+  if (isRawHtml(block)) return;
   const start = Number(block.dataset.line);
   const end = Number(block.dataset.lineEnd);
   const docVersion = opts.docVersion();
