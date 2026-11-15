@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { assertNever } from '../assertNever';
 import { diffDocument } from '../diff/blockDiff';
+import { applyBlockEdit, moveListItemEdit, readBlock, toggleTask } from '../edit/blockEdit';
 import { EditController } from '../edit/editController';
 import type { DocChanges, FromWebview, ToWebview } from '../protocol';
 import type { RenderOptions, RenderResult } from '../render/markdown';
@@ -69,17 +70,33 @@ export class PreviewPanel implements vscode.Disposable {
   readonly onDidDispose = this.emitter.event;
 
   /** Handles the in-preview edit requests; it reads the panel's state only through these callbacks. */
-  private readonly edits = new EditController({
-    settings: () => this.manager.settings,
-    liveDocument: () => this.liveDocument(),
-    documentUri: () => this.document.uri,
-    lastRender: () => (this.lastRender ? { result: this.lastRender, docVersion: this.lastRenderVersion } : undefined),
-    post: (message) => this.post(message),
-    renderAfterEdit: async () => {
-      this.posted = undefined;
-      await this.render();
+  private readonly edits = new EditController(
+    {
+      settings: () => this.manager.settings,
+      liveDocument: () => this.liveDocument(),
+      lastRender: () => (this.lastRender ? { result: this.lastRender, docVersion: this.lastRenderVersion } : undefined),
+      post: (message) => this.post(message),
+      renderAfterEdit: async () => {
+        this.posted = undefined;
+        await this.render();
+      },
+      isShownInEditor: () => {
+        const uri = this.document.uri.toString();
+        // The custom editor (`readMarkdown.editor`) shows the dirty state itself, like a text editor.
+        return vscode.window.tabGroups.all.some((g) =>
+          g.tabs.some(
+            (t) => (t.input instanceof vscode.TabInputText || t.input instanceof vscode.TabInputCustom) && t.input.uri.toString() === uri,
+          ),
+        );
+      },
+      save: async (doc) => {
+        // `save` reports most failures by resolving to false, not by rejecting.
+        if (!(await doc.save())) throw new Error('The document could not be saved');
+      },
+      logError: (task, error) => this.manager.logError(task, error),
     },
-  });
+    { readBlock, applyBlockEdit, toggleTask, moveListItemEdit },
+  );
 
   constructor(
     readonly panel: vscode.WebviewPanel,
