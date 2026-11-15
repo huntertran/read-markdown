@@ -51,6 +51,32 @@ function setPair(id: string | undefined): void {
   for (const arrow of overlay.querySelectorAll<SVGGElement>('.rm-move-arrow')) arrow.classList.toggle('rm-move-arrow-active', arrow.dataset.moveId === id);
 }
 
+/** The two ends of a move, by `data-move-id`. */
+export interface MoveEnds {
+  from?: Element;
+  to?: Element;
+}
+
+/**
+ * One pass over the tagged elements instead of a `querySelector` per element (quadratic with many
+ * moves). Each end is the first element in document order with that id and class, which is what
+ * `[data-move-id="…"].rm-chg-move-to|from` selected: a lone id has one end, extra elements with
+ * the same id and class are ignored.
+ */
+export function collectMovePairs(root: ParentNode): Map<string, MoveEnds> {
+  const pairs = new Map<string, MoveEnds>();
+  for (const el of root.querySelectorAll<HTMLElement>('.rm-chg-move-from[data-move-id], .rm-chg-move-to[data-move-id]')) {
+    const id = el.dataset.moveId!;
+    let ends = pairs.get(id);
+    if (!ends) pairs.set(id, (ends = {}));
+    if (el.classList.contains('rm-chg-move-from')) ends.from ??= el;
+    if (el.classList.contains('rm-chg-move-to')) ends.to ??= el;
+  }
+  return pairs;
+}
+
+// `setPair` and `jumpToPartner` run once per hover/click and query the live DOM: a map kept from
+// the last update could point at elements a later render has already replaced.
 function jumpToPartner(id: string, side: 'from' | 'to'): void {
   const selector = `[data-move-id="${CSS.escape(id)}"]`;
   const target = content.querySelector<HTMLElement>(`${selector}.${side === 'from' ? 'rm-chg-move-from' : 'rm-chg-move-to'}`);
@@ -80,10 +106,16 @@ export function updateChangeGutter(): void {
   const right = box.right - base.left;
 
   const marks: RulerMark[] = [];
+  // Built from the DOM as it is now; elements are replaced on every render, so it is not kept.
+  const pairs = collectMovePairs(content);
 
+  // The outermost tagged element seen so far. Elements come in document order, so a tagged
+  // element has a tagged ancestor exactly when the latest outermost one contains it.
+  let outer: Element | undefined;
   for (const el of content.querySelectorAll<HTMLElement>(CHANGED_SELECTOR)) {
     // One bar per change: nested tagged elements are covered by their tagged ancestor.
-    if (el.parentElement?.closest(CHANGED_SELECTOR) && content.contains(el.parentElement)) continue;
+    if (outer?.contains(el)) continue;
+    outer = el;
     const r = el.getBoundingClientRect();
     if (r.height === 0) continue; // inside a collapsed section
     const kind = barKind(el);
@@ -92,7 +124,7 @@ export function updateChangeGutter(): void {
     const id = el.dataset.moveId;
     const side = el.classList.contains('rm-chg-move-from') ? 'from' : 'to';
     // A jump button only when the other end is shown (inline mode).
-    const partner = id ? content.querySelector(`[data-move-id="${CSS.escape(id)}"].rm-chg-move-${side === 'from' ? 'to' : 'from'}`) : null;
+    const partner = id ? pairs.get(id)?.[side === 'from' ? 'to' : 'from'] : undefined;
     if (id && partner) {
       const down = partner.getBoundingClientRect().top > r.top;
       bars.append(jumpButton(id, side, down, right, r.top - base.top));
@@ -105,7 +137,7 @@ export function updateChangeGutter(): void {
     bars.append(bar('deleted', left, y - base.top, 0));
     marks.push({ kind: 'deleted', top: y + window.scrollY, height: 0 });
   }
-  const arrows = moveArrows(left, base.top);
+  const arrows = moveArrows(left, base.top, pairs);
   if (arrows) bars.append(arrows);
   overlay.replaceChildren(bars);
   updateRuler(marks);
@@ -198,11 +230,11 @@ const HEAD = 4;
  * Inline mode: a connector in the left gutter from each moved-from block to its moved-to block
  * (vertical centers), with an arrowhead at the new location.
  */
-function moveArrows(left: number, top: number): SVGSVGElement | undefined {
+function moveArrows(left: number, top: number, ends: ReadonlyMap<string, MoveEnds>): SVGSVGElement | undefined {
   const pairs: { id: string; y1: number; y2: number }[] = [];
   for (const from of content.querySelectorAll<HTMLElement>('.rm-chg-move-from[data-move-id]')) {
     const id = from.dataset.moveId!;
-    const to = content.querySelector<HTMLElement>(`.rm-chg-move-to[data-move-id="${CSS.escape(id)}"]`);
+    const to = ends.get(id)?.to;
     if (!to) continue;
     const a = from.getBoundingClientRect();
     const b = to.getBoundingClientRect();
