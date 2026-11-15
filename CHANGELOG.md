@@ -31,6 +31,11 @@
 - Full-screen diagram view: ⛶ in the diagram toolbar (or `F` on a focused diagram) shows the diagram over
   the whole preview, fitted to the window; the wheel zooms, dragging pans, `0` fits again and `Esc` closes.
   It follows edits to the diagram while open.
+- Fixed: track changes now marks raw HTML blocks (a top-level `<div>`, `<img>`, `<svg>`, …) that were
+  added, changed or removed; before, they showed no change mark. Raw HTML blocks still cannot be edited
+  in the preview.
+- Fixed: in gutter mode, a nested list removed from a list item now shows a removal mark; adding or
+  removing a nested list no longer flags the parent item's text as changed.
 
 ## 0.5.0
 
