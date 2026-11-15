@@ -1,9 +1,8 @@
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { diffDocument } from '../diff/blockDiff';
-import { applyBlockEdit, moveListItemEdit, readBlock, toggleTask } from '../edit/blockEdit';
-import { isRenderedBlock, isRenderedListMove, isRenderedTaskLine } from '../edit/rendered';
-import type { DocChanges, EditError, FromWebview, ToWebview } from '../protocol';
+import { EditController } from '../edit/editController';
+import type { DocChanges, FromWebview, ToWebview } from '../protocol';
 import type { RenderOptions, RenderResult } from '../render/markdown';
 import { blockStartFor, countOccurrences, searchTermFromSelection } from '../sync/selection';
 import { BaselineSync } from './baselineSync';
@@ -67,6 +66,19 @@ export class PreviewPanel implements vscode.Disposable {
 
   private readonly emitter = new vscode.EventEmitter<void>();
   readonly onDidDispose = this.emitter.event;
+
+  /** Handles the in-preview edit requests; it reads the panel's state only through these callbacks. */
+  private readonly edits = new EditController({
+    settings: () => this.manager.settings,
+    liveDocument: () => this.liveDocument(),
+    documentUri: () => this.document.uri,
+    lastRender: () => (this.lastRender ? { result: this.lastRender, docVersion: this.lastRenderVersion } : undefined),
+    post: (message) => this.post(message),
+    renderAfterEdit: async () => {
+      this.posted = undefined;
+      await this.render();
+    },
+  });
 
   constructor(
     readonly panel: vscode.WebviewPanel,
@@ -435,91 +447,18 @@ export class PreviewPanel implements vscode.Disposable {
         await this.manager.showSource(this, m.line);
         break;
       case 'requestBlockSource':
-        await this.sendBlockSource(m.start, m.end, m.docVersion);
+        await this.edits.sendBlockSource(m.start, m.end, m.docVersion);
         break;
       case 'editBlock':
-        await this.editBlock(m.start, m.end, m.docVersion, m.text);
+        await this.edits.editBlock(m.start, m.end, m.docVersion, m.text);
         break;
       case 'toggleTask':
-        await this.setTaskChecked(m.line, m.checked, m.docVersion);
+        await this.edits.setTaskChecked(m.line, m.checked, m.docVersion);
         break;
       case 'moveListItem':
-        await this.moveListItem(m.starts, m.end, m.from, m.to, m.docVersion);
+        await this.edits.moveListItem(m.starts, m.end, m.from, m.to, m.docVersion);
         break;
     }
-  }
-
-  // ---- in-preview editing ----------------------------------------------------------------
-
-  /**
-   * Why an edit request is refused before touching the document, or undefined if `isRendered` accepts the
-   * ranges of the render the webview is showing. Edit requests carry ranges from `data-line*` attributes, which
-   * raw HTML in the document could forge, so a range is only honoured if the renderer produced it for exactly
-   * the document version the request cites: no render of that version (the preview is behind or ahead of the
-   * document) = `stale`, like the version check in `edit/blockEdit.ts`; a range the render never produced =
-   * `invalid`.
-   */
-  private checkRendered(doc: vscode.TextDocument, docVersion: number, isRendered: (render: RenderResult) => boolean): EditError | undefined {
-    const render = this.lastRender;
-    if (!render || this.lastRenderVersion !== docVersion || doc.version !== docVersion) return 'stale';
-    return isRendered(render) ? undefined : 'invalid';
-  }
-
-  private async sendBlockSource(start: number, end: number, docVersion: number): Promise<void> {
-    // Always reply: the webview waits for the source before opening the editor.
-    const doc = this.manager.settings.editEnabled ? await this.liveDocument() : undefined;
-    const error = doc && this.checkRendered(doc, docVersion, (r) => isRenderedBlock(r.topBlocks, start, end));
-    const result = !doc ? ({ error: 'failed' } as const) : error ? { error } : readBlock(doc, start, end, docVersion);
-    this.post({ type: 'blockSource', start, end, docVersion, ...result });
-  }
-
-  private async editBlock(start: number, end: number, docVersion: number, text: string): Promise<void> {
-    const doc = this.manager.settings.editEnabled ? await this.liveDocument() : undefined;
-    const error = doc && this.checkRendered(doc, docVersion, (r) => isRenderedBlock(r.topBlocks, start, end));
-    const result = !doc ? ({ ok: false, error: 'failed' } as const) : error ? ({ ok: false, error } as const) : await applyBlockEdit(doc, start, end, docVersion, text);
-    if (result.ok && doc) await this.afterEdit(doc);
-    this.post({ type: 'editResult', start, end, ok: result.ok, error: result.ok ? undefined : result.error });
-  }
-
-  private async setTaskChecked(line: number, checked: boolean, docVersion: number): Promise<void> {
-    // Always reply: the webview locks its checkboxes until it hears back.
-    const doc = this.manager.settings.editEnabled ? await this.liveDocument() : undefined;
-    const error = doc && this.checkRendered(doc, docVersion, (r) => isRenderedTaskLine(r.taskLines, line));
-    const result = !doc ? ({ ok: false, error: 'failed' } as const) : error ? ({ ok: false, error } as const) : await toggleTask(doc, line, checked, docVersion);
-    if (result.ok && doc) await this.afterEdit(doc);
-    this.post({ type: 'taskResult', line, ok: result.ok, error: result.ok ? undefined : result.error });
-  }
-
-  private async moveListItem(starts: number[], end: number, from: number, to: number, docVersion: number): Promise<void> {
-    // Always reply: the webview has already reordered the list and puts it back on failure.
-    const doc = this.manager.settings.editEnabled ? await this.liveDocument() : undefined;
-    const error = doc && this.checkRendered(doc, docVersion, (r) => isRenderedListMove(r.lists, starts, end));
-    const result = !doc ? ({ ok: false, error: 'failed' } as const) : error ? ({ ok: false, error } as const) : await moveListItemEdit(doc, starts, end, from, to, docVersion);
-    if (result.ok && doc) await this.afterEdit(doc);
-    this.post(result.ok ? { type: 'moveResult', ok: true, line: result.line } : { type: 'moveResult', ok: false, error: result.error });
-  }
-
-  private async afterEdit(doc: vscode.TextDocument): Promise<void> {
-    // Render right away instead of waiting for the change listener's debounce. Always post: the webview reorders
-    // or toggles its DOM optimistically and relies on this render (before the result message) to settle it,
-    // even if the edit left the text unchanged.
-    this.posted = undefined;
-    await this.render();
-    if (doc.isDirty && !doc.isUntitled && (this.manager.settings.editSaveOnCommit || !this.isOpenInTextEditor())) {
-      // A document not shown in any text editor would otherwise hold an unsaved edit nobody sees.
-      await doc.save();
-    }
-  }
-
-  /** True if a tab shows this document and so displays its unsaved state. */
-  private isOpenInTextEditor(): boolean {
-    const uri = this.document.uri.toString();
-    // The custom editor (`readMarkdown.editor`) shows the dirty state itself, like a text editor.
-    return vscode.window.tabGroups.all.some((g) =>
-      g.tabs.some(
-        (t) => (t.input instanceof vscode.TabInputText || t.input instanceof vscode.TabInputCustom) && t.input.uri.toString() === uri,
-      ),
-    );
   }
 
   dispose(): void {
