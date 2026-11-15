@@ -73,8 +73,24 @@ function buildSectionTree(root: HTMLElement, opts: SectionOptions): void {
   root.replaceChildren(frag);
 }
 
+/**
+ * The body of a collapsed section. It is hidden with `hidden="until-found"`, not `display: none`, so
+ * the find widget (Chromium find-in-page) still searches it and can reveal a match (`revealFound`).
+ * Its content therefore keeps layout boxes: code that measures elements must skip it with `isFolded`
+ * instead of relying on empty client rects.
+ */
+const FOLDED = '.rm-collapsed > .rm-section-body';
+
+/** True if `el` is inside the body of a collapsed section (not shown). */
+export function isFolded(el: Element): boolean {
+  return el.closest(FOLDED) !== null;
+}
+
 function applyCollapsed(section: Element, collapsed: boolean): void {
   section.classList.toggle('rm-collapsed', collapsed);
+  const body = section.querySelector(':scope > .rm-section-body');
+  if (collapsed) body?.setAttribute('hidden', 'until-found');
+  else body?.removeAttribute('hidden');
   section.querySelector(':scope > .rm-heading > .rm-fold')?.setAttribute('aria-expanded', String(!collapsed));
 }
 
@@ -100,6 +116,17 @@ export function expandTo(node: Node | null): boolean {
   }
   if (changed) notify();
   return changed;
+}
+
+/**
+ * Handles `beforematch`: the find widget found text in a collapsed section body (`target`) and is
+ * about to show it. Expands that section; the event fires once per collapsed ancestor. Returns true
+ * if a section was expanded.
+ */
+export function revealFound(target: EventTarget | null): boolean {
+  if (!(target instanceof Element) || !target.matches(FOLDED)) return false;
+  setCollapsed(target.parentElement!, false);
+  return true;
 }
 
 export function setAllCollapsed(root: HTMLElement, collapsed: boolean): void {

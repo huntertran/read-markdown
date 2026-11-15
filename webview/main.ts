@@ -16,7 +16,7 @@ import { initNavResize, syncNavWidth } from './navResize';
 import { sanitize } from './sanitize';
 import { initScrollMap, invalidate, isSuppressed, lineAtTop, scrollProgrammatically, scrollToLine, updateAnchor } from './scroll';
 import { initSearch, reapplySearch, setSearch } from './search';
-import { buildSections, collapsedSlugs, expandTo, onSectionsChange, setAllCollapsed, setCollapsed } from './sections';
+import { buildSections, collapsedSlugs, expandTo, onSectionsChange, revealFound, setAllCollapsed, setCollapsed } from './sections';
 import { initSettingsPanel, updateSettingsPanel } from './settingsPanel';
 import { applyTableWidths, cancelTableResize, initTableResize } from './tableResize';
 import { initTaskProgress, updateTaskProgress } from './taskProgress';
@@ -331,6 +331,14 @@ content.addEventListener('click', (e) => {
   } else {
     post({ type: 'openLink', href });
   }
+});
+
+// The find widget found text inside a collapsed section: expand it, as a fold click would.
+content.addEventListener('beforematch', (e) => {
+  if (!revealFound(e.target)) return;
+  invalidate();
+  saveCollapsed();
+  updateActive();
 });
 
 // One button: "Collapse all" while any section is expanded, "Expand all" once every section is collapsed.

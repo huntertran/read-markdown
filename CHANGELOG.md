@@ -36,6 +36,8 @@
   in the preview.
 - Fixed: in gutter mode, a nested list removed from a list item now shows a removal mark; adding or
   removing a nested list no longer flags the parent item's text as changed.
+- Fixed: Find (Ctrl/Cmd+F) in the preview now also finds text in collapsed sections and expands the
+  section of the match; before, collapsed sections were skipped.
 - Fixed: task progress followed steps by their position instead of their text, so when an agent
   inserted, reordered or reworded steps the "just done" flash and the follow-scroll could pick the wrong
   step. The follow button no longer scrolls to a removed step shown by track changes.

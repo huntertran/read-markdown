@@ -1342,7 +1342,16 @@ body[data-heading-highlight='leftBorder'] .rm-markdown h3 {
   transform: translateX(-20%) rotate(-45deg);
 }
 
+/* A collapsed body carries hidden="until-found" (sections.ts): not rendered, but the find widget still
+   searches it and expands the section on a match. `display: none` would hide it from the search. */
 .rm-collapsed > .rm-section-body {
+  content-visibility: hidden;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.rm-collapsed > .rm-section-body:not([hidden='until-found']) {
   display: none;
 }
 
@@ -1718,8 +1727,10 @@ body.rm-list-dragging * {
     display: none !important;
   }
 
-  .rm-collapsed > .rm-section-body {
+  .rm-collapsed > .rm-section-body,
+  .rm-collapsed > .rm-section-body:not([hidden='until-found']) {
     display: block;
+    content-visibility: visible;
   }
 }
 

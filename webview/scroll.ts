@@ -1,4 +1,5 @@
 // Maps between source lines (data-line attributes) and vertical scroll positions.
+import { isFolded } from './sections';
 
 interface Entry {
   line: number;
@@ -54,8 +55,9 @@ function getEntries(): Entry[] {
     for (const el of root.querySelectorAll<HTMLElement>('[data-line]')) {
       const line = Number(el.dataset.line);
       if (!Number.isFinite(line) || line <= lastLine) continue;
+      if (isFolded(el)) continue; // inside a collapsed section
       const rects = el.getClientRects();
-      if (rects.length === 0) continue; // hidden (e.g. inside a collapsed section)
+      if (rects.length === 0) continue; // hidden
       const top = rects[0].top + scrollY;
       if (top < lastTop) continue;
       result.push({ line, top });

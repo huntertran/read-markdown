@@ -3,7 +3,7 @@
 // in #rm-main (outside #rm-content, which is replaced on every render) and never take pointer events.
 // The same changes are also marked on the scrollbar (overview ruler, like the editor's).
 import { CHANGED_SELECTOR } from './changes';
-import { expandTo } from './sections';
+import { expandTo, isFolded } from './sections';
 import { invalidate } from './scroll';
 
 type BarKind = 'added' | 'modified' | 'deleted' | 'moved' | 'removed';
@@ -116,8 +116,9 @@ export function updateChangeGutter(): void {
     // One bar per change: nested tagged elements are covered by their tagged ancestor.
     if (outer?.contains(el)) continue;
     outer = el;
+    if (isFolded(el)) continue;
     const r = el.getBoundingClientRect();
-    if (r.height === 0) continue; // inside a collapsed section
+    if (r.height === 0) continue; // hidden
     const kind = barKind(el);
     bars.append(bar(kind, left, r.top - base.top, r.height));
     marks.push({ kind, top: r.top + window.scrollY, height: r.height });
@@ -131,6 +132,7 @@ export function updateChangeGutter(): void {
     }
   }
   for (const el of content.querySelectorAll<HTMLElement>('[data-rm-del-before], [data-rm-del-after]')) {
+    if (isFolded(el)) continue;
     const r = el.getBoundingClientRect();
     if (r.height === 0) continue;
     const y = el.dataset.rmDelBefore !== undefined ? r.top : r.bottom;
@@ -235,10 +237,10 @@ function moveArrows(left: number, top: number, ends: ReadonlyMap<string, MoveEnd
   for (const from of content.querySelectorAll<HTMLElement>('.rm-chg-move-from[data-move-id]')) {
     const id = from.dataset.moveId!;
     const to = ends.get(id)?.to;
-    if (!to) continue;
+    if (!to || isFolded(from) || isFolded(to)) continue; // an end is folded away
     const a = from.getBoundingClientRect();
     const b = to.getBoundingClientRect();
-    if (a.height === 0 || b.height === 0) continue; // an end is folded away
+    if (a.height === 0 || b.height === 0) continue; // an end is hidden
     pairs.push({ id, y1: a.top + a.height / 2 - top, y2: b.top + b.height / 2 - top });
   }
   if (pairs.length === 0) return undefined;

@@ -1,5 +1,5 @@
 import * as assert from 'node:assert/strict';
-import { buildSections, collapsedSlugs, expandTo, setAllCollapsed, setCollapsed, type SectionOptions } from '../../webview/sections';
+import { buildSections, collapsedSlugs, expandTo, isFolded, revealFound, setAllCollapsed, setCollapsed, type SectionOptions } from '../../webview/sections';
 import { useDom } from './dom';
 
 const OPTS: SectionOptions = { collapsible: true, startCollapsedBelowLevel: 0, collapsed: undefined };
@@ -228,6 +228,71 @@ describe('sections', () => {
       const root = build('<h1 id="a">A</h1><p id="x">x</p>');
       assert.equal(expandTo(root.querySelector('#x')), false);
       assert.equal(expandTo(null), false);
+    });
+  });
+
+  // A collapsed body is hidden with hidden="until-found" so the find widget still searches it.
+  describe('collapsed bodies and the find widget', () => {
+    const body = (root: HTMLElement, slug: string) => root.querySelector(`section[data-slug="${slug}"] > .rm-section-body`) as HTMLElement;
+
+    it('marks the body of a collapsed section hidden="until-found" and clears it on expand', () => {
+      const root = build('<h1 id="a">A</h1><p>x</p>');
+      const section = root.querySelector('section') as HTMLElement;
+      assert.equal(body(root, 'a').hasAttribute('hidden'), false);
+      setCollapsed(section, true);
+      assert.equal(body(root, 'a').getAttribute('hidden'), 'until-found');
+      setCollapsed(section, false);
+      assert.equal(body(root, 'a').hasAttribute('hidden'), false);
+    });
+
+    it('marks sections that start collapsed, and every section on fold all', () => {
+      const doc = '<h1 id="a">A</h1><h2 id="b">B</h2><p>x</p>';
+      const root = build(doc, { startCollapsedBelowLevel: 2 });
+      assert.equal(body(root, 'a').hasAttribute('hidden'), false);
+      assert.equal(body(root, 'b').getAttribute('hidden'), 'until-found');
+      setAllCollapsed(root, true);
+      assert.equal(root.querySelectorAll('.rm-section-body[hidden="until-found"]').length, 2);
+      setAllCollapsed(root, false);
+      assert.equal(root.querySelectorAll('.rm-section-body[hidden]').length, 0);
+    });
+
+    it('expandTo clears the attribute of the sections it expands', () => {
+      const root = build('<h1 id="a">A</h1><h2 id="b">B</h2><p id="deep">x</p>');
+      setAllCollapsed(root, true);
+      expandTo(root.querySelector('#deep'));
+      assert.equal(root.querySelectorAll('.rm-section-body[hidden]').length, 0);
+    });
+
+    it('isFolded: content of a collapsed section, at any depth, but not its heading', () => {
+      const root = build('<h1 id="a">A</h1><p id="p">x</p><h2 id="b">B</h2><p id="deep">y</p>');
+      const el = (id: string) => root.querySelector(`#${id}`) as HTMLElement;
+      assert.deepEqual(['a', 'p', 'b', 'deep'].map((id) => isFolded(el(id))), [false, false, false, false]);
+      setCollapsed(root.querySelector('section[data-slug="b"]') as HTMLElement, true);
+      assert.deepEqual(['a', 'p', 'b', 'deep'].map((id) => isFolded(el(id))), [false, false, false, true]);
+      setCollapsed(root.querySelector('section[data-slug="a"]') as HTMLElement, true);
+      assert.deepEqual(['a', 'p', 'b', 'deep'].map((id) => isFolded(el(id))), [false, true, true, true]);
+      setAllCollapsed(root, false);
+      assert.equal(isFolded(el('deep')), false);
+    });
+
+    it('revealFound expands the section whose body the find widget is about to show', () => {
+      const root = build('<h1 id="a">A</h1><h2 id="b">B</h2><p>x</p>');
+      setAllCollapsed(root, true);
+      // The browser fires beforematch on each collapsed ancestor body, innermost first.
+      assert.equal(revealFound(body(root, 'b')), true);
+      assert.deepEqual(collapsedSlugs(root), ['a']);
+      assert.equal(revealFound(body(root, 'a')), true);
+      assert.deepEqual(collapsedSlugs(root), []);
+      assert.equal(root.querySelectorAll('.rm-section-body[hidden]').length, 0);
+    });
+
+    it('revealFound ignores other targets and bodies that are not collapsed', () => {
+      const root = build('<h1 id="a">A</h1><p id="p">x</p>');
+      assert.equal(revealFound(body(root, 'a')), false, 'not collapsed');
+      setAllCollapsed(root, true);
+      assert.equal(revealFound(root.querySelector('#p')), false, 'not a section body');
+      assert.equal(revealFound(null), false);
+      assert.deepEqual(collapsedSlugs(root), ['a']);
     });
   });
 });

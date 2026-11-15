@@ -2,6 +2,7 @@
 import type { Heading } from '../src/protocol';
 import { buildHeadingIndex, findActiveSlug, type HeadingIndex, type HeadingPosition } from './activeHeading';
 import { onInvalidate } from './scroll';
+import { isFolded } from './sections';
 import type { TaskCounts } from './taskProgress';
 
 let list: HTMLOListElement;
@@ -99,8 +100,8 @@ function getHeadingIndex(): HeadingIndex {
   const entries: HeadingPosition[] = [];
   for (const h of headings) {
     const el = document.getElementById(h.slug);
-    // Hidden headings (inside a collapsed section) have no rects and are skipped.
-    if (!el || !content.contains(el) || el.getClientRects().length === 0) continue;
+    // Headings inside a collapsed section, or otherwise hidden (no rects), are skipped.
+    if (!el || !content.contains(el) || isFolded(el) || el.getClientRects().length === 0) continue;
     entries.push({ slug: h.slug, top: el.getBoundingClientRect().top + scrollY });
   }
   headingIndex = buildHeadingIndex(entries);
