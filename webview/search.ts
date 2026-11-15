@@ -1,8 +1,8 @@
 // Highlights occurrences of the text selected in the source editor using the CSS Custom Highlight API
 // (no DOM mutation, so it is cheap and does not disturb scroll sync or selection).
-import { REMOVED_SELECTOR } from './changes';
 import { expandTo } from './sections';
 import { invalidate, scrollProgrammatically } from './scroll';
+import { createIndexCache, findMatches, type IndexCache } from './searchIndex';
 
 export interface SearchRequest {
   term: string;
@@ -10,11 +10,6 @@ export interface SearchRequest {
   blockLine: number;
   occurrence: number;
 }
-
-const MAX_MATCHES = 5000;
-// Removed text (track changes) is not in the source, so it must not shift occurrence counts.
-const SKIP = `.rm-mermaid, .rm-fold, .rm-copy, button, style, script, svg, del.rm-del, ${REMOVED_SELECTOR}`;
-const BLOCK = 'p, li, h1, h2, h3, h4, h5, h6, td, th, pre, blockquote, dt, dd, summary, figcaption, div, section, table';
 
 let current: SearchRequest | undefined;
 let badge: HTMLElement | undefined;
@@ -32,11 +27,25 @@ export function setSearch(root: HTMLElement, req: SearchRequest): void {
 
 /** Re-applies the active search after the content was re-rendered. */
 export function reapplySearch(root: HTMLElement): void {
+  // The observer would catch the new content too; dropping the index here makes it explicit.
+  cache?.index.invalidate();
   apply(root, false);
 }
 
-function escapeRegExp(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// The flattened text is reused between selection changes; see createIndexCache for what invalidates it.
+let cache: { root: HTMLElement; index: IndexCache } | undefined;
+
+function indexFor(root: HTMLElement): IndexCache {
+  if (cache?.root !== root) {
+    cache?.index.dispose();
+    cache = { root, index: createIndexCache(root) };
+  }
+  return cache.index;
+}
+
+function dropIndex(): void {
+  cache?.index.dispose();
+  cache = undefined;
 }
 
 function apply(root: HTMLElement, reveal: boolean): void {
@@ -44,60 +53,13 @@ function apply(root: HTMLElement, reveal: boolean): void {
   CSS.highlights.delete('rm-search');
   CSS.highlights.delete('rm-search-current');
   if (!current) {
+    // No search: stop observing the preview.
+    dropIndex();
     if (badge) badge.hidden = true;
     return;
   }
 
-  // Flatten text nodes, inserting a separator between blocks so matches never span blocks.
-  const nodes: Text[] = [];
-  const starts: number[] = [];
-  let text = '';
-  let lastBlock: Element | null = null;
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-    acceptNode: (n) => (n.parentElement?.closest(SKIP) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
-  });
-  for (let n = walker.nextNode() as Text | null; n; n = walker.nextNode() as Text | null) {
-    const block = n.parentElement?.closest(BLOCK) ?? null;
-    if (block !== lastBlock) {
-      text += '\u0000'; // not matched by \s, so matches cannot cross blocks
-      lastBlock = block;
-    }
-    nodes.push(n);
-    starts.push(text.length);
-    text += n.data;
-  }
-
-  const pattern = escapeRegExp(current.term).replace(/\s+/g, '\\s+');
-  const re = new RegExp(pattern, current.caseSensitive ? 'g' : 'gi');
-  const ranges: Range[] = [];
-  const locate = (offset: number, isEnd: boolean): [Text, number] => {
-    let lo = 0;
-    let hi = starts.length - 1;
-    let idx = 0;
-    while (lo <= hi) {
-      const mid = (lo + hi) >> 1;
-      // For an end offset prefer the node in which the match ends (offset may equal its length).
-      if (starts[mid] < offset || (!isEnd && starts[mid] === offset)) {
-        idx = mid;
-        lo = mid + 1;
-      } else {
-        hi = mid - 1;
-      }
-    }
-    return [nodes[idx], Math.min(offset - starts[idx], nodes[idx].length)];
-  };
-  for (let m = re.exec(text); m && ranges.length < MAX_MATCHES; m = re.exec(text)) {
-    if (m[0].length === 0) {
-      re.lastIndex++;
-      continue;
-    }
-    const range = document.createRange();
-    const [sn, so] = locate(m.index, false);
-    const [en, eo] = locate(m.index + m[0].length, true);
-    range.setStart(sn, so);
-    range.setEnd(en, eo);
-    ranges.push(range);
-  }
+  const ranges = findMatches(indexFor(root).get(), current.term, current.caseSensitive);
 
   if (ranges.length === 0) {
     showBadge(current.term, 0, 0);

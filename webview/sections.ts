@@ -11,7 +11,26 @@ export interface SectionOptions {
   collapsed: ReadonlySet<string> | undefined;
 }
 
+const listeners: (() => void)[] = [];
+
+/**
+ * Runs `fn` after sections were built, or collapsed/expanded. Every change goes through this
+ * module, so the fold-all button needs no DOM observer.
+ */
+export function onSectionsChange(fn: () => void): void {
+  listeners.push(fn);
+}
+
+function notify(): void {
+  for (const fn of listeners) fn();
+}
+
 export function buildSections(root: HTMLElement, opts: SectionOptions): void {
+  buildSectionTree(root, opts);
+  notify();
+}
+
+function buildSectionTree(root: HTMLElement, opts: SectionOptions): void {
   if (!opts.collapsible) return;
   const frag = document.createDocumentFragment();
   const stack: { level: number; body: HTMLElement }[] = [];
@@ -49,14 +68,19 @@ export function buildSections(root: HTMLElement, opts: SectionOptions): void {
     const collapsed = opts.collapsed
       ? opts.collapsed.has(child.id)
       : opts.startCollapsedBelowLevel > 0 && level >= opts.startCollapsedBelowLevel;
-    if (collapsed) setCollapsed(section, true);
+    if (collapsed) applyCollapsed(section, true);
   }
   root.replaceChildren(frag);
 }
 
-export function setCollapsed(section: Element, collapsed: boolean): void {
+function applyCollapsed(section: Element, collapsed: boolean): void {
   section.classList.toggle('rm-collapsed', collapsed);
   section.querySelector(':scope > .rm-heading > .rm-fold')?.setAttribute('aria-expanded', String(!collapsed));
+}
+
+export function setCollapsed(section: Element, collapsed: boolean): void {
+  applyCollapsed(section, collapsed);
+  notify();
 }
 
 /** Expands every collapsed section that contains `node`. Returns true if anything changed. */
@@ -69,16 +93,18 @@ export function expandTo(node: Node | null): boolean {
     // A heading stays visible when its own section is collapsed, so that section needs no expanding.
     const ownHeading = section.querySelector(':scope > .rm-heading');
     if (section.classList.contains('rm-collapsed') && !(node && ownHeading?.contains(node))) {
-      setCollapsed(section, false);
+      applyCollapsed(section, false);
       changed = true;
     }
     el = section.parentElement;
   }
+  if (changed) notify();
   return changed;
 }
 
 export function setAllCollapsed(root: HTMLElement, collapsed: boolean): void {
-  root.querySelectorAll('section.rm-section').forEach((s) => setCollapsed(s, collapsed));
+  root.querySelectorAll('section.rm-section').forEach((s) => applyCollapsed(s, collapsed));
+  notify();
 }
 
 export function collapsedSlugs(root: HTMLElement): string[] {

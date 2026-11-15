@@ -1,5 +1,7 @@
 // Quick navigation sidebar: heading outline with filter and active-section tracking.
 import type { Heading } from '../src/protocol';
+import { buildHeadingIndex, findActiveSlug, type HeadingIndex, type HeadingPosition } from './activeHeading';
+import { onInvalidate } from './scroll';
 import type { TaskCounts } from './taskProgress';
 
 let list: HTMLOListElement;
@@ -9,6 +11,7 @@ let content: HTMLElement;
 let headings: Heading[] = [];
 let items: HTMLLIElement[] = [];
 let activeSlug = '';
+let headingIndex: HeadingIndex | undefined;
 
 export function initNav(opts: {
   list: HTMLOListElement;
@@ -21,6 +24,7 @@ export function initNav(opts: {
   empty = opts.empty;
   filterInput = opts.filter;
   content = opts.content;
+  onInvalidate(() => (headingIndex = undefined));
   filterInput.addEventListener('input', applyFilter);
   filterInput.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
@@ -42,6 +46,7 @@ export function initNav(opts: {
 
 export function setHeadings(next: Heading[], maxDepth: number): void {
   headings = next.filter((h) => h.level <= maxDepth);
+  headingIndex = undefined;
   const minLevel = Math.min(...headings.map((h) => h.level), 6);
   items = headings.map((h) => {
     const li = document.createElement('li');
@@ -87,17 +92,26 @@ function applyFilter(): void {
   });
 }
 
+/** Heading positions are measured once per layout change (same moments as the scroll map). */
+function getHeadingIndex(): HeadingIndex {
+  if (headingIndex) return headingIndex;
+  const scrollY = window.scrollY;
+  const entries: HeadingPosition[] = [];
+  for (const h of headings) {
+    const el = document.getElementById(h.slug);
+    // Hidden headings (inside a collapsed section) have no rects and are skipped.
+    if (!el || !content.contains(el) || el.getClientRects().length === 0) continue;
+    entries.push({ slug: h.slug, top: el.getBoundingClientRect().top + scrollY });
+  }
+  headingIndex = buildHeadingIndex(entries);
+  return headingIndex;
+}
+
 /** Marks the heading of the section currently at the top of the viewport. */
 export function updateActive(): void {
   if (!items.length) return;
   const threshold = Math.min(120, window.innerHeight / 4);
-  let slug = headings[0]?.slug ?? '';
-  for (const h of headings) {
-    const el = document.getElementById(h.slug);
-    if (!el || !content.contains(el) || el.getClientRects().length === 0) continue;
-    if (el.getBoundingClientRect().top <= threshold) slug = h.slug;
-    else break;
-  }
+  const slug = findActiveSlug(getHeadingIndex(), window.scrollY, threshold, headings[0]?.slug ?? '');
   if (slug === activeSlug) return;
   activeSlug = slug;
   for (const li of items) {

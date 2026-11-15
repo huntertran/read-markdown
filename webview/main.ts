@@ -4,6 +4,7 @@ import { initChangeGutter, scheduleChangeGutter } from './changeGutter';
 import { applyChanges } from './changes';
 import { hideBlockActions, initBlockActions, registerBlockAction, setBlockActionsEnabled } from './blockActions';
 import { decorateCodeBlocks, initCodeBlocks } from './codeblocks';
+import { createDebouncedSaver } from './debouncedSaver';
 import { deferRender, editBlockAtLine, initBlockEdit, isEditing, onBlockSource, onEditResult, onTaskResult, setEditable, syncTaskCheckboxes } from './editBlock';
 import { type MermaidOptions, renderMermaid } from './mermaid';
 import { decorateDiagrams, initDiagramZoom } from './mermaidZoom';
@@ -13,10 +14,12 @@ import { initNavResize, syncNavWidth } from './navResize';
 import { sanitize } from './sanitize';
 import { initScrollMap, invalidate, isSuppressed, lineAtTop, scrollProgrammatically, scrollToLine, updateAnchor } from './scroll';
 import { initSearch, reapplySearch, setSearch } from './search';
-import { buildSections, collapsedSlugs, expandTo, setAllCollapsed, setCollapsed } from './sections';
+import { buildSections, collapsedSlugs, expandTo, onSectionsChange, setAllCollapsed, setCollapsed } from './sections';
 import { initSettingsPanel, updateSettingsPanel } from './settingsPanel';
 import { applyTableWidths, cancelTableResize, initTableResize } from './tableResize';
 import { initTaskProgress, updateTaskProgress } from './taskProgress';
+
+const SCROLL_SAVE_MS = 200;
 
 const content = $('rm-content');
 const body = document.body;
@@ -120,6 +123,8 @@ function renderContent(msg: Extract<ToWebview, { type: 'render' }>): void {
   cancelTableResize();
   lastRender = msg;
   const scrollY = window.scrollY;
+  // The restore below reads scrollLine from the saved state, which must not lag behind the scroll.
+  scrollLineSaver.flush();
   const state = getState();
   const previous = rendered ? new Set(collapsedSlugs(content)) : state.collapsed ? new Set(state.collapsed) : undefined;
 
@@ -246,6 +251,15 @@ window.addEventListener('message', (event: MessageEvent<ToWebview>) => {
   }
 });
 
+// The scroll line only has to survive a reload, so it is written once scrolling pauses instead of
+// on every frame (patchState copies and serializes the whole state). Patching just this field at
+// write time keeps it from overwriting newer values of the other fields.
+const scrollLineSaver = createDebouncedSaver((scrollLine: number) => patchState({ scrollLine }), SCROLL_SAVE_MS);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') scrollLineSaver.flush();
+});
+window.addEventListener('pagehide', () => scrollLineSaver.flush());
+
 let scrollFrame = 0;
 let lastSentLine = -1;
 window.addEventListener(
@@ -257,7 +271,7 @@ window.addEventListener(
       updateActive();
       updateAnchor();
       const line = lineAtTop();
-      patchState({ scrollLine: line });
+      scrollLineSaver.save(line);
       if (!isSuppressed() && ui?.scrollSync && Math.abs(line - lastSentLine) >= 0.5) {
         lastSentLine = line;
         post({ type: 'revealLine', line });
@@ -312,8 +326,9 @@ function updateFoldAll(): void {
   foldAll.setAttribute('aria-label', label);
 }
 
-// Sections change on render, fold clicks, search reveal and outline navigation.
-new MutationObserver(updateFoldAll).observe(content, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
+// Sections change on render, fold clicks, fold all, search reveal and outline navigation; all of
+// them go through sections.ts, which reports each change here.
+onSectionsChange(updateFoldAll);
 
 foldAll.addEventListener('click', () => {
   setAllCollapsed(content, foldAll.dataset.mode === 'collapse');

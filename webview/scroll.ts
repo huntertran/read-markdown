@@ -32,8 +32,16 @@ export function updateAnchor(): void {
   if (performance.now() >= holdAnchorUntil) anchorLine = lineAtTop();
 }
 
+const invalidationListeners: (() => void)[] = [];
+
+/** Runs `fn` whenever layout-derived caches (this map, heading positions) must be rebuilt. */
+export function onInvalidate(fn: () => void): void {
+  invalidationListeners.push(fn);
+}
+
 export function invalidate(): void {
   entries = undefined;
+  for (const fn of invalidationListeners) fn();
 }
 
 function getEntries(): Entry[] {

@@ -17,6 +17,7 @@ const GLOBALS = [
   'Text',
   'NodeFilter',
   'Range',
+  'MutationObserver',
 ] as const;
 
 export function useDom(): void {
