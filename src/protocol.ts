@@ -9,8 +9,20 @@ export interface Heading {
   line: number;
 }
 
-export type ThemePreset = 'vscode' | 'light' | 'dark' | 'sepia' | 'high-contrast';
-export type HeadingHighlight = 'none' | 'underline' | 'background' | 'leftBorder';
+// Every enum setting is one `as const` list with its type derived from it. The lists must equal the
+// `enum` of the matching setting in package.json (test/unit/settingsValues.test.ts checks that).
+export const AUTO_OPEN_MODES = ['off', 'beside', 'active'] as const;
+export type AutoOpen = (typeof AUTO_OPEN_MODES)[number];
+export const NAV_POSITIONS = ['left', 'right'] as const;
+export type NavPosition = (typeof NAV_POSITIONS)[number];
+export const THEME_PRESETS = ['vscode', 'light', 'dark', 'sepia', 'high-contrast'] as const;
+export type ThemePreset = (typeof THEME_PRESETS)[number];
+export const HEADING_HIGHLIGHTS = ['none', 'underline', 'background', 'leftBorder'] as const;
+export type HeadingHighlight = (typeof HEADING_HIGHLIGHTS)[number];
+export const CHANGES_MODES = ['inline', 'gutter', 'off'] as const;
+export type ChangesMode = (typeof CHANGES_MODES)[number];
+/** What a preview shows while changes are on (the toolbar toggle flips between the two). */
+export type ChangesView = Exclude<ChangesMode, 'off'>;
 
 /**
  * Mermaid theme (`readMarkdown.mermaid.theme`). `auto` = Mermaid's `base` theme colored from the
@@ -25,7 +37,7 @@ export type MermaidLook = (typeof MERMAID_LOOKS)[number];
 
 export interface UiConfig {
   navShow: boolean;
-  navPosition: 'left' | 'right';
+  navPosition: NavPosition;
   navMaxDepth: number;
   preset: ThemePreset;
   /** Color scheme implied by the preset; 'auto' follows the VS Code theme. */
@@ -61,8 +73,6 @@ export interface UiConfig {
   /** Task progress bar and outline counts (`readMarkdown.tasks.progress`); only with `agentProgress`. */
   taskProgress: boolean;
 }
-
-export type ChangesMode = 'inline' | 'gutter' | 'off';
 
 /**
  * One changed top-level block, by 0-based source line: `line` in the current document, `oldLine`
@@ -182,7 +192,7 @@ export interface WebviewState {
   scrollLine?: number;
   collapsed?: string[];
   /** This preview's override of `readMarkdown.changes.mode` (toolbar toggle). */
-  changesMode?: 'inline' | 'gutter';
+  changesMode?: ChangesView;
   /** Scroll to task items as they become in progress (toolbar toggle); undefined = on. */
   followTasks?: boolean;
   /** Column widths set by dragging table borders (webview/tableResize.ts). */

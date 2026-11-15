@@ -1,17 +1,17 @@
 import * as vscode from 'vscode';
-import type { ChangesMode, HeadingHighlight, MermaidLook, MermaidTheme, QuickSettingKey, ThemePreset, UiConfig } from '../protocol';
-import { MERMAID_LOOKS, MERMAID_THEMES, QUICK_SETTING_KEYS } from '../protocol';
-import { type HeadingMap, type StyleSettings, schemeForPreset } from './styles';
+import type { AutoOpen, ChangesMode, MermaidLook, MermaidTheme, NavPosition, UiConfig } from '../protocol';
+import { type StyleSettings, schemeForPreset } from './styles';
+import { DEFAULTS, headingMapOf, readBool, readEnum, readNumber, readString, stringArrayOr } from './values';
+
+export { validateQuickSetting } from './values';
 
 export const SECTION = 'readMarkdown';
-
-export type AutoOpen = 'off' | 'beside' | 'active';
 
 export interface Settings extends StyleSettings {
   autoOpen: AutoOpen;
   scrollSync: boolean;
   navShow: boolean;
-  navPosition: 'left' | 'right';
+  navPosition: NavPosition;
   navMaxDepth: number;
   customCssInline: string;
   customCssFiles: string[];
@@ -34,57 +34,57 @@ export interface Settings extends StyleSettings {
   allowRemoteContent: boolean;
 }
 
+/**
+ * Reads every setting through the typed readers in `values.ts`: a hand-edited settings.json can hold
+ * any JSON in any field, so nothing is taken from `get` on trust.
+ */
 export function getSettings(scope?: vscode.ConfigurationScope): Settings {
   const c = vscode.workspace.getConfiguration(SECTION, scope);
+  const get = (key: keyof typeof DEFAULTS): unknown => c.get<unknown>(key);
   return {
-    autoOpen: c.get<AutoOpen>('preview.autoOpen', 'off'),
-    scrollSync: c.get<boolean>('preview.scrollSync', true),
-    navShow: c.get<boolean>('nav.show', true),
-    navPosition: c.get<'left' | 'right'>('nav.position', 'left'),
-    navMaxDepth: c.get<number>('nav.maxDepth', 3),
-    navWidth: c.get<number>('nav.width', 260),
-    preset: c.get<ThemePreset>('theme.preset', 'vscode'),
-    bodyFontFamily: c.get<string>('body.fontFamily', ''),
-    bodyFontSize: c.get<number>('body.fontSize', 15),
-    bodyLineHeight: c.get<number>('body.lineHeight', 1.65),
-    bodyMaxWidth: c.get<number>('body.maxWidth', 860),
-    bodyFullWidth: c.get<boolean>('body.fullWidth', false),
-    bodyBackgroundColor: c.get<string>('body.backgroundColor', ''),
-    bodyTextColor: c.get<string>('body.textColor', ''),
-    headingFontFamily: c.get<string>('headings.fontFamily', ''),
-    headingScale: c.get<number>('headings.scale', 1),
-    headingFontSizes: c.get<HeadingMap>('headings.fontSizes', {}),
-    headingColors: c.get<HeadingMap>('headings.colors', {}),
-    headingHighlight: c.get<HeadingHighlight>('headings.highlight', 'underline'),
-    headingHighlightColor: c.get<string>('headings.highlightColor', ''),
-    customCssInline: c.get<string>('customCss.inline', ''),
-    customCssFiles: c.get<string[]>('customCss.files', []),
-    searchSyncSelection: c.get<boolean>('search.syncSelection', true),
-    searchCaseSensitive: c.get<boolean>('search.caseSensitive', false),
-    searchMinLength: c.get<number>('search.minLength', 2),
-    searchHighlightColor: c.get<string>('search.highlightColor', ''),
-    searchCurrentHighlightColor: c.get<string>('search.currentHighlightColor', ''),
-    tableHeaderBackgroundColor: c.get<string>('table.headerBackgroundColor', ''),
-    tableHeaderTextColor: c.get<string>('table.headerTextColor', ''),
-    copyButton: c.get<boolean>('code.copyButton', true),
-    mermaid: c.get<boolean>('mermaid.enabled', true),
-    mermaidTheme: oneOf(c.get<string>('mermaid.theme'), MERMAID_THEMES, 'auto'),
-    mermaidLook: oneOf(c.get<string>('mermaid.look'), MERMAID_LOOKS, 'classic'),
-    collapsible: c.get<boolean>('sections.collapsible', true),
-    startCollapsedBelowLevel: c.get<number>('sections.startCollapsedBelowLevel', 0),
-    editEnabled: c.get<boolean>('edit.enabled', false),
-    editDoubleClick: c.get<boolean>('edit.doubleClick', false),
-    editSaveOnCommit: c.get<boolean>('edit.saveOnCommit', false),
-    changesMode: c.get<ChangesMode>('changes.mode', 'inline'),
-    agentProgress: c.get<boolean>('tasks.agentProgress', true),
-    taskProgress: c.get<boolean>('tasks.progress', true),
-    allowRemoteContent: c.get<boolean>('security.allowRemoteContent', true),
+    autoOpen: readEnum('preview.autoOpen', get('preview.autoOpen')),
+    scrollSync: readBool('preview.scrollSync', get('preview.scrollSync')),
+    navShow: readBool('nav.show', get('nav.show')),
+    navPosition: readEnum('nav.position', get('nav.position')),
+    navMaxDepth: readNumber('nav.maxDepth', get('nav.maxDepth')),
+    navWidth: readNumber('nav.width', get('nav.width')),
+    preset: readEnum('theme.preset', get('theme.preset')),
+    bodyFontFamily: readString('body.fontFamily', get('body.fontFamily')),
+    bodyFontSize: readNumber('body.fontSize', get('body.fontSize')),
+    bodyLineHeight: readNumber('body.lineHeight', get('body.lineHeight')),
+    bodyMaxWidth: readNumber('body.maxWidth', get('body.maxWidth')),
+    bodyFullWidth: readBool('body.fullWidth', get('body.fullWidth')),
+    bodyBackgroundColor: readString('body.backgroundColor', get('body.backgroundColor')),
+    bodyTextColor: readString('body.textColor', get('body.textColor')),
+    headingFontFamily: readString('headings.fontFamily', get('headings.fontFamily')),
+    headingScale: readNumber('headings.scale', get('headings.scale')),
+    headingFontSizes: headingMapOf(get('headings.fontSizes')),
+    headingColors: headingMapOf(get('headings.colors')),
+    headingHighlight: readEnum('headings.highlight', get('headings.highlight')),
+    headingHighlightColor: readString('headings.highlightColor', get('headings.highlightColor')),
+    customCssInline: readString('customCss.inline', get('customCss.inline')),
+    customCssFiles: stringArrayOr(get('customCss.files'), DEFAULTS['customCss.files']),
+    searchSyncSelection: readBool('search.syncSelection', get('search.syncSelection')),
+    searchCaseSensitive: readBool('search.caseSensitive', get('search.caseSensitive')),
+    searchMinLength: readNumber('search.minLength', get('search.minLength')),
+    searchHighlightColor: readString('search.highlightColor', get('search.highlightColor')),
+    searchCurrentHighlightColor: readString('search.currentHighlightColor', get('search.currentHighlightColor')),
+    tableHeaderBackgroundColor: readString('table.headerBackgroundColor', get('table.headerBackgroundColor')),
+    tableHeaderTextColor: readString('table.headerTextColor', get('table.headerTextColor')),
+    copyButton: readBool('code.copyButton', get('code.copyButton')),
+    mermaid: readBool('mermaid.enabled', get('mermaid.enabled')),
+    mermaidTheme: readEnum('mermaid.theme', get('mermaid.theme')),
+    mermaidLook: readEnum('mermaid.look', get('mermaid.look')),
+    collapsible: readBool('sections.collapsible', get('sections.collapsible')),
+    startCollapsedBelowLevel: readNumber('sections.startCollapsedBelowLevel', get('sections.startCollapsedBelowLevel')),
+    editEnabled: readBool('edit.enabled', get('edit.enabled')),
+    editDoubleClick: readBool('edit.doubleClick', get('edit.doubleClick')),
+    editSaveOnCommit: readBool('edit.saveOnCommit', get('edit.saveOnCommit')),
+    changesMode: readEnum('changes.mode', get('changes.mode')),
+    agentProgress: readBool('tasks.agentProgress', get('tasks.agentProgress')),
+    taskProgress: readBool('tasks.progress', get('tasks.progress')),
+    allowRemoteContent: readBool('security.allowRemoteContent', get('security.allowRemoteContent')),
   };
-}
-
-/** `value` if it is one of `allowed` (hand-edited settings.json may hold anything), else `fallback`. */
-function oneOf<T extends string>(value: string | undefined, allowed: readonly T[], fallback: T): T {
-  return allowed.includes(value as T) ? (value as T) : fallback;
 }
 
 export function toUiConfig(s: Settings): UiConfig {
@@ -115,56 +115,6 @@ export function toUiConfig(s: Settings): UiConfig {
     agentProgress: s.agentProgress,
     taskProgress: s.taskProgress,
   };
-}
-
-const PRESETS: readonly string[] = ['vscode', 'light', 'dark', 'sepia', 'high-contrast'];
-const HIGHLIGHTS: readonly string[] = ['none', 'underline', 'background', 'leftBorder'];
-const CHANGES_MODES: readonly string[] = ['inline', 'gutter', 'off'];
-
-/** Validates a value coming from the webview quick panel. Returns undefined if invalid. */
-export function validateQuickSetting(key: string, value: unknown): unknown {
-  if (!(QUICK_SETTING_KEYS as readonly string[]).includes(key)) return undefined;
-  const k = key as QuickSettingKey;
-  const inRange = (min: number, max: number) =>
-    typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max ? value : undefined;
-  switch (k) {
-    case 'nav.show':
-    case 'body.fullWidth':
-    case 'edit.enabled':
-    case 'edit.doubleClick':
-    case 'tasks.agentProgress':
-    case 'tasks.progress':
-      return typeof value === 'boolean' ? value : undefined;
-    case 'nav.position':
-      return value === 'left' || value === 'right' ? value : undefined;
-    case 'nav.maxDepth':
-      return Number.isInteger(value) ? inRange(1, 6) : undefined;
-    case 'nav.width':
-      // '' resets to the default (double-click on the resize handle).
-      return value === '' ? value : Number.isInteger(value) ? inRange(120, 600) : undefined;
-    case 'theme.preset':
-      return typeof value === 'string' && PRESETS.includes(value) ? value : undefined;
-    case 'body.fontSize':
-      return inRange(8, 40);
-    case 'body.lineHeight':
-      return inRange(1, 3);
-    case 'body.maxWidth':
-      return inRange(0, 4000);
-    case 'headings.scale':
-      return inRange(0.5, 3);
-    case 'headings.highlight':
-      return typeof value === 'string' && HIGHLIGHTS.includes(value) ? value : undefined;
-    case 'changes.mode':
-      return typeof value === 'string' && CHANGES_MODES.includes(value) ? value : undefined;
-    case 'mermaid.theme':
-      return typeof value === 'string' && (MERMAID_THEMES as readonly string[]).includes(value) ? value : undefined;
-    case 'mermaid.look':
-      return typeof value === 'string' && (MERMAID_LOOKS as readonly string[]).includes(value) ? value : undefined;
-    case 'table.headerBackgroundColor':
-    case 'table.headerTextColor':
-      // '' resets to the theme default; the color picker only produces #rrggbb.
-      return value === '' || (typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value)) ? value : undefined;
-  }
 }
 
 /** Writes a setting to the most specific scope that already defines it (default: user settings). */

@@ -12,7 +12,7 @@
 // Clones lose `data-line*` / `id`, so scroll sync, editing, search and the outline ignore them.
 import { type AlignItem, alignBlocks } from '../src/diff/blockDiff';
 import { diffTokens, similarity, tokenize, tokenizeLines } from '../src/diff/textDiff';
-import type { BlockChange } from '../src/protocol';
+import type { BlockChange, ChangesView } from '../src/protocol';
 import { sanitize } from './sanitize';
 
 /** Removed content shown for reference only (not part of the current document). */
@@ -50,7 +50,7 @@ export function indexBaseline(originalHtml: string): Baseline {
   return blocks;
 }
 
-export function applyChanges(root: HTMLElement, ops: readonly BlockChange[], original: Baseline, mode: 'inline' | 'gutter'): void {
+export function applyChanges(root: HTMLElement, ops: readonly BlockChange[], original: Baseline, mode: ChangesView): void {
   const ctx: Context = { inline: mode === 'inline', nextMoveId: 0, marks: 0 };
   const current = (line: number | null) =>
     line === null ? null : root.querySelector<HTMLElement>(`:scope > [data-line-end][data-line="${line}"]`);

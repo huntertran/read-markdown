@@ -1,8 +1,55 @@
 // Gear popover with the most common reading settings, grouped into icon tabs. Changes are
 // written to VS Code settings by the extension, which then broadcasts the new config back to every preview.
-import type { QuickSettingKey, UiConfig } from '../src/protocol';
+import {
+  CHANGES_MODES,
+  HEADING_HIGHLIGHTS,
+  MERMAID_LOOKS,
+  MERMAID_THEMES,
+  NAV_POSITIONS,
+  THEME_PRESETS,
+  type ChangesMode,
+  type HeadingHighlight,
+  type MermaidLook,
+  type MermaidTheme,
+  type NavPosition,
+  type QuickSettingKey,
+  type ThemePreset,
+  type UiConfig,
+} from '../src/protocol';
 import { getState, patchState, post } from './api';
 import { toHex } from './color';
+
+/** Select options in the order of an enum list; a missing label is a compile error, not a drifted list. */
+function labelled<T extends string>(values: readonly T[], labels: Record<T, string>): [string, string][] {
+  return values.map((v) => [v, labels[v]]);
+}
+
+const PRESET_LABELS: Record<ThemePreset, string> = {
+  vscode: 'Follow VS Code',
+  light: 'Light',
+  dark: 'Dark',
+  sepia: 'Sepia',
+  'high-contrast': 'High contrast',
+};
+const HIGHLIGHT_LABELS: Record<HeadingHighlight, string> = {
+  none: 'Plain',
+  underline: 'Underline',
+  background: 'Background',
+  leftBorder: 'Left border',
+};
+const NAV_POSITION_LABELS: Record<NavPosition, string> = { left: 'Left', right: 'Right' };
+const MERMAID_THEME_LABELS: Record<MermaidTheme, string> = {
+  auto: 'Match preview',
+  default: 'Default / Dark',
+  neo: 'Neo',
+  redux: 'Redux',
+  'redux-color': 'Redux color',
+  base: 'Base (light only)',
+  forest: 'Forest (light only)',
+  neutral: 'Neutral (light only)',
+};
+const MERMAID_LOOK_LABELS: Record<MermaidLook, string> = { classic: 'Classic', neo: 'Neo', handDrawn: 'Hand-drawn' };
+const CHANGES_MODE_LABELS: Record<ChangesMode, string> = { inline: 'Inline', gutter: 'Bars only', off: 'Off' };
 
 type Control =
   | { kind: 'select'; key: QuickSettingKey; label: string; options: [string, string][]; get: (c: UiConfig) => string; parse?: (v: string) => unknown }
@@ -32,13 +79,7 @@ const SECTIONS: Section[] = [
         kind: 'select',
         key: 'theme.preset',
         label: 'Theme',
-        options: [
-          ['vscode', 'Follow VS Code'],
-          ['light', 'Light'],
-          ['dark', 'Dark'],
-          ['sepia', 'Sepia'],
-          ['high-contrast', 'High contrast'],
-        ],
+        options: labelled(THEME_PRESETS, PRESET_LABELS),
         get: (c) => c.preset,
       },
       { kind: 'range', key: 'body.fontSize', label: 'Font size', min: 10, max: 28, step: 1, get: (c) => c.fontSize, format: (v) => `${v}px` },
@@ -48,12 +89,7 @@ const SECTIONS: Section[] = [
         kind: 'select',
         key: 'headings.highlight',
         label: 'Heading style',
-        options: [
-          ['none', 'Plain'],
-          ['underline', 'Underline'],
-          ['background', 'Background'],
-          ['leftBorder', 'Left border'],
-        ],
+        options: labelled(HEADING_HIGHLIGHTS, HIGHLIGHT_LABELS),
         get: (c) => c.headingHighlight,
       },
     ],
@@ -80,10 +116,7 @@ const SECTIONS: Section[] = [
         kind: 'select',
         key: 'nav.position',
         label: 'Navigation side',
-        options: [
-          ['left', 'Left'],
-          ['right', 'Right'],
-        ],
+        options: labelled(NAV_POSITIONS, NAV_POSITION_LABELS),
         get: (c) => c.navPosition,
       },
       {
@@ -128,27 +161,14 @@ const SECTIONS: Section[] = [
         kind: 'select',
         key: 'mermaid.theme',
         label: 'Diagram theme',
-        options: [
-          ['auto', 'Match preview'],
-          ['default', 'Default / Dark'],
-          ['neo', 'Neo'],
-          ['redux', 'Redux'],
-          ['redux-color', 'Redux color'],
-          ['base', 'Base (light only)'],
-          ['forest', 'Forest (light only)'],
-          ['neutral', 'Neutral (light only)'],
-        ],
+        options: labelled(MERMAID_THEMES, MERMAID_THEME_LABELS),
         get: (c) => c.mermaidTheme,
       },
       {
         kind: 'select',
         key: 'mermaid.look',
         label: 'Diagram style',
-        options: [
-          ['classic', 'Classic'],
-          ['neo', 'Neo'],
-          ['handDrawn', 'Hand-drawn'],
-        ],
+        options: labelled(MERMAID_LOOKS, MERMAID_LOOK_LABELS),
         get: (c) => c.mermaidLook,
       },
     ],
@@ -164,11 +184,7 @@ const SECTIONS: Section[] = [
         kind: 'select',
         key: 'changes.mode',
         label: 'Changes vs git',
-        options: [
-          ['inline', 'Inline'],
-          ['gutter', 'Bars only'],
-          ['off', 'Off'],
-        ],
+        options: labelled(CHANGES_MODES, CHANGES_MODE_LABELS),
         get: (c) => c.changesMode,
       },
     ],

@@ -1,4 +1,4 @@
-import type { ToWebview, UiConfig } from '../src/protocol';
+import type { ChangesMode, ChangesView, ToWebview, UiConfig } from '../src/protocol';
 import { $, getState, patchState, post } from './api';
 import { acceptRender, baselineFor, shouldRequestBaseline } from './baseline';
 import { initChangeGutter, scheduleChangeGutter } from './changeGutter';
@@ -171,14 +171,14 @@ function renderContent(msg: Extract<ToWebview, { type: 'render' }>): void {
 // ---- changes vs git index ----------------------------------------------------------------
 
 /** The setting, unless this preview's toolbar toggle overrides it. */
-function changesMode(): 'inline' | 'gutter' | 'off' {
+function changesMode(): ChangesMode {
   if (!ui || ui.changesMode === 'off') return 'off';
   return getState().changesMode ?? ui.changesMode;
 }
 
 const changesButton = $('rm-toggle-changes');
 
-function updateChangesButton(mode: 'inline' | 'gutter' | undefined): void {
+function updateChangesButton(mode: ChangesView | undefined): void {
   changesButton.hidden = !mode;
   const label = mode === 'inline' ? 'Show changes as bars only' : 'Show changes inline';
   changesButton.title = label;
