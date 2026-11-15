@@ -5,6 +5,7 @@ import hljs from 'highlight.js/lib/common';
 import type { SourceBlock } from '../diff/blockDiff';
 import type { ListRange } from '../edit/rendered';
 import type { Heading } from '../protocol';
+import { createCachedHighlighter } from './highlightCache';
 import { Slugger, headingText } from './headings';
 import { neutralizeReservedAttributes } from './rawHtml';
 
@@ -192,17 +193,8 @@ export function createMarkdownRenderer(): (source: string, options: RenderOption
       return `<div class="rm-mermaid"${lines}><pre class="mermaid">${escapeHtml(token.content)}</pre></div>\n`;
     }
 
-    let body: string;
     const language = lang && hljs.getLanguage(lang) ? lang : '';
-    if (language) {
-      try {
-        body = hljs.highlight(token.content, { language, ignoreIllegals: true }).value;
-      } catch {
-        body = escapeHtml(token.content);
-      }
-    } else {
-      body = escapeHtml(token.content);
-    }
+    const body = language ? safeHighlight(token.content, language) : escapeHtml(token.content);
     const langAttr = lang ? ` data-lang="${escapeHtml(lang)}"` : '';
     const cls = language ? ` class="hljs language-${escapeHtml(language)}"` : ' class="hljs"';
     return `<pre class="rm-code"${lines}${langAttr}><code${cls}>${body}</code></pre>\n`;
@@ -272,9 +264,13 @@ function lineAttrs(token: Token): string {
   return (line !== null ? ` data-line="${line}"` : '') + (end !== null ? ` data-line-end="${end}"` : '');
 }
 
+// Only fences with an explicit, known language are highlighted (no auto-detection), so the output is
+// a function of language + code alone: that is the cache key.
+const highlightCached = createCachedHighlighter((code, language) => hljs.highlight(code, { language, ignoreIllegals: true }).value);
+
 function safeHighlight(code: string, language: string): string {
   try {
-    return hljs.highlight(code, { language, ignoreIllegals: true }).value;
+    return highlightCached(code, language);
   } catch {
     return escapeHtml(code);
   }
