@@ -132,12 +132,7 @@ function children(el: Element): HTMLElement[] | undefined {
 }
 
 function alignItem(el: HTMLElement): AlignItem {
-  const checkbox = el.querySelector<HTMLInputElement>(':scope > input[type="checkbox"], :scope > p > input[type="checkbox"]');
-  return {
-    kind: el.tagName,
-    text: el.textContent ?? '',
-    key: markup(el) + (checkbox?.checked ? '☑' : ''),
-  };
+  return { kind: el.tagName, text: el.textContent ?? '', key: markup(el) };
 }
 
 /** Markup without source positions, to compare versions rendered from different line numbers. */
@@ -203,6 +198,8 @@ function diffListItem(old: HTMLElement, el: HTMLElement, ctx: Context): void {
   });
   for (const prev of oldLists.slice(newLists.length)) {
     if (ctx.inline) el.append(cloneRemoved(prev, 'rm-chg-del'));
+    // Gutter: the removal is at the end of the item's content, so the tick goes at the item's bottom edge.
+    else markRemovedAt(el, null, el);
     ctx.marks++;
   }
 }
@@ -244,9 +241,14 @@ interface TextDiffOptions {
 
 /** Word diff of the text in `old` → `el`, applied to `el`. */
 function diffText(old: HTMLElement, el: HTMLElement, ctx: Context, { skip, inPlace }: TextDiffOptions = {}): void {
-  const nodes = textNodes(el, skip);
+  // `el` is the live document, so its nodes are split to their own text; the original is only read.
+  const nodes = textNodes(el, skip).map((n) => {
+    const [start, end] = ownRange(n, skip);
+    if (end < n.data.length) n.splitText(end);
+    return start > 0 ? n.splitText(start) : n;
+  });
   const oldText = textNodes(old, skip)
-    .map((n) => n.data)
+    .map((n) => n.data.slice(...ownRange(n, skip)))
     .join('');
   const newText = nodes.map((n) => n.data).join('');
   if (oldText === newText) return;
@@ -265,12 +267,34 @@ function diffText(old: HTMLElement, el: HTMLElement, ctx: Context, { skip, inPla
   if (ctx.inline) wrapRuns(el, nodes, runs);
 }
 
+function isSkipped(node: Node | null, skip?: string): boolean {
+  return skip !== undefined && node instanceof Element && node.matches(skip);
+}
+
+/**
+ * The part of `node`'s text that is content: whitespace touching a skipped element is layout around
+ * it (the renderer writes `text\n<ul>…</ul>\n`), present in one version and absent in the other.
+ */
+function ownRange(node: Text, skip?: string): [number, number] {
+  let end = node.data.length;
+  if (isSkipped(node.nextSibling, skip)) end = node.data.trimEnd().length;
+  let start = 0;
+  if (isSkipped(node.previousSibling, skip)) start = end - node.data.slice(0, end).trimStart().length;
+  return [start, end];
+}
+
+/**
+ * The text nodes of `el` in order, leaving out subtrees matching `skip` and the whitespace-only
+ * nodes right next to them (see `ownRange`).
+ */
 function textNodes(el: HTMLElement, skip?: string): Text[] {
   const nodes: Text[] = [];
   const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
     acceptNode: (n) => {
       const skipped = skip ? n.parentElement?.closest(skip) : null;
-      return skipped && skipped !== el && el.contains(skipped) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+      if (skipped && skipped !== el && el.contains(skipped)) return NodeFilter.FILTER_REJECT;
+      if (!/\S/.test((n as Text).data) && (isSkipped(n.previousSibling, skip) || isSkipped(n.nextSibling, skip))) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
     },
   });
   for (let n = walker.nextNode(); n; n = walker.nextNode()) nodes.push(n as Text);

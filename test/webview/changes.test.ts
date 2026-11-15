@@ -641,10 +641,12 @@ describe('changes (webview)', () => {
 
   describe('nested lists', () => {
     // A list item's own text is diffed without its nested lists, which are then aligned item by item.
-    // The parent's text nodes include the whitespace around the nested list, so that whitespace is
-    // reported as `ins`/`del` too; it is not visible text, so the tests only require it to stay blank.
+    // The renderer writes `text\n<ul>…</ul>\n`: the whitespace touching the nested list (the end of the
+    // text node in front of it, the node after it) is layout, not the item's own text. Adding or
+    // removing a nested list must therefore not report a change of the parent's text.
     const blank = (root: Element) => {
-      for (const el of q(root, 'ins, del')) assert.equal(el.textContent?.trim(), '', `${el.localName} must not carry visible text`);
+      assert.equal(q(root, 'ins, del').length, 0, 'the whitespace around the nested list is not a text change');
+      assert.equal(q(root, '.rm-chg-mod').length, 0, 'the parent item is not flagged as modified');
     };
     const ADDED = '- parent item text here\n  - child added\n- other item\n';
     const PLAIN = '- parent item text here\n- other item\n';
@@ -663,6 +665,21 @@ describe('changes (webview)', () => {
       });
     }
 
+    it('gutter: an added nested list leaves no removal marker', () => {
+      const { root } = run(PLAIN, ADDED, 'gutter');
+      assert.equal(q(root, '[data-rm-del-before], [data-rm-del-after]').length, 0);
+    });
+
+    for (const mode of ['inline', 'gutter'] as const) {
+      it(`a nested list added to an item leaves the whitespace after the list alone (${mode})`, () => {
+        const { root } = run(PLAIN, ADDED, mode);
+        const nested = only(root, 'li > ul');
+        assert.equal(nested.nextSibling?.nodeType, Node.TEXT_NODE, 'the whitespace after the list is not wrapped');
+        assert.equal(nested.nextSibling?.textContent?.trim(), '');
+        assert.equal(nested.nextElementSibling, null);
+      });
+    }
+
     it('inline: shows a removed nested list as a clone at the end of its parent item', () => {
       const { root } = run(REMOVED, PLAIN, 'inline');
       const clone = only(root, 'li > ul.rm-chg-del');
@@ -675,18 +692,34 @@ describe('changes (webview)', () => {
       assert.equal(q(root, 'ul ul').length, 1, 'only the clone is nested');
       assert.equal(q(root, 'ul > li').filter((li) => li.textContent?.includes('other item')).length, 1);
       assert.equal(q(root, REMOVED_SELECTOR).length, 1);
+      assert.equal(q(root, '[data-rm-del-before], [data-rm-del-after]').length, 0, 'inline mode uses the clone, not a marker');
       blank(root);
     });
 
-    it('gutter: a removed nested list leaves no clone but still flags its parent item', () => {
+    it('gutter: a removed nested list leaves no clone, but a removal marker at the end of its parent item', () => {
       const { root } = run(REMOVED, PLAIN, 'gutter');
       assert.equal(q(root, 'ul ul').length, 0);
       assert.equal(q(root, REMOVED_SELECTOR).length, 0);
       assert.equal(q(root, 'ins, del').length, 0);
-      const flagged = q(root, CHANGED_SELECTOR);
-      assert.equal(flagged.length, 1);
-      assert.equal(flagged[0].localName, 'li');
-      assert.ok(flagged[0].textContent?.includes('parent item text here'));
+      const marked = only(root, '[data-rm-del-before], [data-rm-del-after]');
+      assert.equal(marked.localName, 'li');
+      assert.ok(marked.textContent?.includes('parent item text here'));
+      assert.equal(marked.dataset.rmDelAfter, '', 'the tick is drawn at the bottom of the item');
+      assert.equal(marked.dataset.rmDelBefore, undefined);
+      blank(root);
+    });
+
+    it('gutter: removing one of two nested lists marks the item once, and the remaining list stays', () => {
+      // A nested list of a different type is a separate `ul` / `ol` child of the item.
+      const before = '- parent item text here\n  - child one\n\n  1. numbered two\n- other item\n';
+      const after = '- parent item text here\n  - child one\n- other item\n';
+      const { root } = run(before, after, 'gutter');
+      assert.equal(q(root, 'li > ol').length, 0);
+      assert.equal(only(root, 'li > ul').localName, 'ul');
+      const marked = only(root, '[data-rm-del-before], [data-rm-del-after]');
+      assert.equal(marked.dataset.rmDelAfter, '');
+      assert.ok(marked.textContent?.includes('parent item text here'));
+      assert.equal(q(root, 'ins, del').length, 0);
     });
 
     const NESTED = (last: string) => `- parent item text here\n  - child one two ${last}\n- other item\n`;
@@ -847,6 +880,51 @@ describe('changes (webview)', () => {
       assert.equal(q(root, 'ul > li').length, 4);
     });
 
+    it('inline: a rewritten list item keeps the nodes around its nested list where they were', () => {
+      const doc = (first: string) => `- ${first}
+  - child one
+  - child two
+  - child three
+`;
+      const current = doc('Totally unrelated zebra');
+      const plain = document.createElement('div');
+      plain.replaceChildren(sanitize(render(current, OPTS).html));
+      const { root } = run(doc('The quick brown fox'), current, 'inline');
+      const item = only(root, 'li.rm-chg-mod');
+      const nested = only(item, 'ul');
+      const children = [...item.childNodes];
+      const wrapped = children.slice(0, children.indexOf(nested)).filter((n): n is HTMLElement => n instanceof HTMLElement);
+      assert.deepEqual(
+        wrapped.map((n) => n.localName),
+        ['del', 'ins'],
+        'del then ins, both in front of the nested list',
+      );
+      assert.equal(wrapped[0].textContent?.trim(), 'The quick brown fox');
+      assert.equal(wrapped[1].textContent?.trim(), 'Totally unrelated zebra');
+      // What follows the nested list is exactly what the current document has there: a plain text node.
+      const after = only(plain, 'li > ul').nextSibling as Node;
+      assert.equal(nested.nextSibling?.nodeType, Node.TEXT_NODE);
+      assert.equal(nested.nextSibling?.textContent, after.textContent);
+      assert.equal(nested.nextSibling, item.lastChild, 'nothing is inserted after the whitespace');
+      assert.equal(q(nested, 'ins, del').length, 0);
+    });
+
+    it('gutter: a rewritten list item with a nested list is tagged and its nodes are untouched', () => {
+      const doc = (first: string) => `- ${first}
+  - child one
+  - child two
+  - child three
+`;
+      const current = doc('Totally unrelated zebra');
+      const plain = document.createElement('div');
+      plain.replaceChildren(sanitize(render(current, OPTS).html));
+      const { root } = run(doc('The quick brown fox'), current, 'gutter');
+      const item = only(root, 'li.rm-chg-mod');
+      assert.equal(q(root, 'ins, del').length, 0);
+      assert.equal(q(root, CHANGED_SELECTOR).length, 1);
+      assert.equal(item.innerHTML, q(plain, 'li')[0].innerHTML);
+    });
+
     it('inline: an emptied table cell keeps its old text as a lone del (no text nodes left to wrap)', () => {
       const doc = (last: string) => `| A | B | C | D |\n|---|---|---|---|\n| alpha one | beta two | gamma three | ${last} |\n`;
       const { root } = run(doc('delta four'), doc(''), 'inline');
@@ -904,6 +982,15 @@ describe('changes (webview)', () => {
         const mod = only(root, 'li.rm-chg-mod');
         assert.equal(mod.textContent?.trim(), 'ship it');
         assert.equal(only(mod, 'input').hasAttribute('checked'), true);
+        assert.equal(q(root, CHANGED_SELECTOR).length, 1);
+        assert.equal(q(root, 'ins, del').length, 0);
+      });
+
+      it(`flags a task item whose checkbox was unticked (${mode})`, () => {
+        const { root } = run('- [x] write tests\n- [x] ship it\n', '- [x] write tests\n- [ ] ship it\n', mode);
+        const mod = only(root, 'li.rm-chg-mod');
+        assert.equal(mod.textContent?.trim(), 'ship it');
+        assert.equal(only(mod, 'input').hasAttribute('checked'), false);
         assert.equal(q(root, CHANGED_SELECTOR).length, 1);
         assert.equal(q(root, 'ins, del').length, 0);
       });
