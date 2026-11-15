@@ -1,7 +1,7 @@
 // Aligns two block sequences (top-level Markdown blocks, or list items / rows inside one block)
 // into insert / delete / modify / move operations. Pure: used by the extension and the webview.
 import type { BlockChange } from '../protocol';
-import { bagSimilarity, diffSequences, normalize, similarity, tokenBag } from './textDiff';
+import { bagSimilarity, diffSequences, normalize, similarity, type TokenBag, tokenBag } from './textDiff';
 
 export interface AlignItem {
   /** Block type; only blocks of the same kind are paired as modified or moved. */
@@ -34,6 +34,14 @@ export interface AlignOptions {
   maxMoveComparisons?: number;
   /** First move id to hand out (lets callers keep ids unique across nested alignments). */
   firstMoveId?: number;
+  /**
+   * Time budget in ms. Once spent, the remaining similarity work is skipped and only exact matches
+   * and exact moves are reported: items that are not identical show as removed + added, never as
+   * modified or as edited moves. The result is still complete, only less refined. Default: unlimited.
+   */
+  budgetMs?: number;
+  /** Clock for `budgetMs` in ms (default `performance.now`); lets tests force or avoid expiry. */
+  now?: () => number;
 }
 
 const DEFAULTS: Required<AlignOptions> = {
@@ -42,12 +50,16 @@ const DEFAULTS: Required<AlignOptions> = {
   moveMinLength: 12,
   maxMoveComparisons: 2500,
   firstMoveId: 0,
+  budgetMs: Infinity,
+  now: () => performance.now(),
 };
 
 /** Returns undefined when the sequences are too large to diff. */
 export function alignBlocks(oldItems: readonly AlignItem[], newItems: readonly AlignItem[], options: AlignOptions = {}): AlignOp[] | undefined {
   const o = { ...DEFAULTS, ...options };
-  const matches = matchItems(oldItems, newItems, o.modifyThreshold);
+  const startedAt = o.budgetMs === Infinity ? 0 : o.now();
+  const outOfTime = () => o.budgetMs !== Infinity && o.now() - startedAt >= o.budgetMs;
+  const matches = matchItems(oldItems, newItems, o.modifyThreshold, outOfTime);
   if (!matches) return undefined;
 
   const ops: AlignOp[] = [];
@@ -69,7 +81,8 @@ export function alignBlocks(oldItems: readonly AlignItem[], newItems: readonly A
   // Moves: a removed and an added item (anywhere in the document) with (nearly) the same text.
   const norm = (it: AlignItem) => normalize(it.text);
   const delTaken = new Set<number>();
-  const fuzzy = unpairedDel.length * unpairedIns.length <= o.maxMoveComparisons;
+  let fuzzy = unpairedDel.length * unpairedIns.length <= o.maxMoveComparisons && !outOfTime();
+  const delBags: (TokenBag | undefined)[] = [];
   const exact = new Map<string, number[]>(); // kind + text -> indices into unpairedDel
   unpairedDel.forEach((d, i) => {
     const key = `${oldItems[d.a].kind}\u0000${norm(oldItems[d.a])}`;
@@ -84,9 +97,18 @@ export function alignBlocks(oldItems: readonly AlignItem[], newItems: readonly A
     let edited = false;
     if (best === undefined && fuzzy) {
       let bestScore = o.moveThreshold;
+      const bagB = tokenBag(newItems[b].text);
       for (let i = 0; i < unpairedDel.length; i++) {
         const d = unpairedDel[i];
         if (delTaken.has(i) || oldItems[d.a].kind !== newItems[b].kind) continue;
+        // The shared-token count is an upper bound of the LCS, so a bag score below the bar means
+        // the (much costlier) ordered score is below it too: skipping changes no result.
+        const bagD = (delBags[i] ??= tokenBag(oldItems[d.a].text));
+        if (bagSimilarity(bagD, bagB) < bestScore) continue;
+        if (outOfTime()) {
+          fuzzy = false;
+          break;
+        }
         const s = similarity(oldItems[d.a].text, newItems[b].text);
         if (s >= bestScore) {
           bestScore = s;
@@ -127,7 +149,12 @@ const MAX_WEIGHTED_CELLS = 250_000;
  * So the changed middle is aligned by total similarity instead: an identical pair scores 1, a
  * same-kind pair with word-bag similarity ≥ `threshold` scores that similarity (< 1).
  */
-function matchItems(oldItems: readonly AlignItem[], newItems: readonly AlignItem[], threshold: number): [number, number][] | undefined {
+function matchItems(
+  oldItems: readonly AlignItem[],
+  newItems: readonly AlignItem[],
+  threshold: number,
+  outOfTime: () => boolean,
+): [number, number][] | undefined {
   const matches: [number, number][] = [];
   let start = 0;
   while (start < oldItems.length && start < newItems.length && same(oldItems[start], newItems[start])) {
@@ -146,8 +173,10 @@ function matchItems(oldItems: readonly AlignItem[], newItems: readonly AlignItem
   const m = endB - start;
 
   if (n > 0 && m > 0) {
-    if (n * m <= MAX_WEIGHTED_CELLS) {
-      matches.push(...weightedMatches(oldItems.slice(start, endA), newItems.slice(start, endB), threshold).map(([a, b]) => [a + start, b + start] as [number, number]));
+    // Undefined: too large, or out of time (exact LCS is cheap in comparison and always bounded).
+    const weighted = n * m <= MAX_WEIGHTED_CELLS ? weightedMatches(oldItems.slice(start, endA), newItems.slice(start, endB), threshold, outOfTime) : undefined;
+    if (weighted) {
+      for (const [a, b] of weighted) matches.push([a + start, b + start]);
     } else {
       const edits = diffSequences(oldItems.slice(start, endA), newItems.slice(start, endB), same);
       if (!edits) return undefined;
@@ -157,13 +186,21 @@ function matchItems(oldItems: readonly AlignItem[], newItems: readonly AlignItem
   return [...matches, ...suffix];
 }
 
-function weightedMatches(a: readonly AlignItem[], b: readonly AlignItem[], threshold: number): [number, number][] {
+/** Undefined when `outOfTime` fires while scoring pairs. */
+function weightedMatches(
+  a: readonly AlignItem[],
+  b: readonly AlignItem[],
+  threshold: number,
+  outOfTime: () => boolean,
+): [number, number][] | undefined {
   const n = a.length;
   const m = b.length;
+  if (outOfTime()) return undefined;
   const bagsA = a.map((x) => tokenBag(x.text));
   const bagsB = b.map((y) => tokenBag(y.text));
   const score = new Float64Array(n * m);
   for (let i = 0; i < n; i++) {
+    if (i > 0 && outOfTime()) return undefined;
     for (let j = 0; j < m; j++) {
       if (a[i].kind !== b[j].kind) continue;
       if (same(a[i], b[j])) score[i * m + j] = 1;
@@ -210,9 +247,18 @@ export interface SourceBlock extends AlignItem {
   end: number;
 }
 
-/** Top-level block changes from `original` to `current`; undefined when too large to diff. */
-export function diffDocument(original: readonly SourceBlock[], current: readonly SourceBlock[]): BlockChange[] | undefined {
-  const ops = alignBlocks(original, current);
+/**
+ * Time budget of the document diff. It runs on the extension host thread, which all extensions
+ * share; real edits take a few ms, so this only trips on huge, heavily rewritten documents.
+ */
+export const DOCUMENT_DIFF_BUDGET_MS = 250;
+
+/**
+ * Top-level block changes from `original` to `current`; undefined when too large to diff.
+ * `options` overrides the defaults (notably `budgetMs`, see {@link AlignOptions}).
+ */
+export function diffDocument(original: readonly SourceBlock[], current: readonly SourceBlock[], options: AlignOptions = {}): BlockChange[] | undefined {
+  const ops = alignBlocks(original, current, { budgetMs: DOCUMENT_DIFF_BUDGET_MS, ...options });
   if (!ops) return undefined;
   const lineOf = (b: number) => (b < current.length ? current[b].line : null);
   return ops.map((op): BlockChange => {

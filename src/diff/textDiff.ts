@@ -187,8 +187,37 @@ export function similarity(a: string, b: string): number {
   const ta = tokenize(a).filter((t) => /\S/.test(t));
   const tb = tokenize(b).filter((t) => /\S/.test(t));
   if (ta.length === 0 && tb.length === 0) return 1;
-  const edits = diffSequences(ta, tb, undefined, 1_000_000);
-  if (!edits) return 0;
-  const common = edits.filter((e) => e.op === 'eq').length;
+  // Same trimming and cap as the diff this replaces, but only the LCS length is needed, so no
+  // edit script and no full table.
+  let start = 0;
+  while (start < ta.length && start < tb.length && ta[start] === tb[start]) start++;
+  let endA = ta.length;
+  let endB = tb.length;
+  while (endA > start && endB > start && ta[endA - 1] === tb[endB - 1]) {
+    endA--;
+    endB--;
+  }
+  if ((endA - start) * (endB - start) > MAX_SIMILARITY_CELLS) return 0;
+  const common = start + (ta.length - endA) + lcsLength(ta, start, endA, tb, start, endB);
   return (2 * common) / (ta.length + tb.length);
+}
+
+/** Largest changed middle (tokens × tokens) {@link similarity} compares; beyond it the score is 0. */
+const MAX_SIMILARITY_CELLS = 1_000_000;
+
+/** LCS length of a[aFrom..aTo) and b[bFrom..bTo) with two rows of the shorter side. */
+function lcsLength(a: readonly string[], aFrom: number, aTo: number, b: readonly string[], bFrom: number, bTo: number): number {
+  if (aTo - aFrom < bTo - bFrom) return lcsLength(b, bFrom, bTo, a, aFrom, aTo);
+  const m = bTo - bFrom;
+  if (m === 0) return 0;
+  let prev = new Uint32Array(m + 1);
+  let cur = new Uint32Array(m + 1);
+  for (let i = aFrom; i < aTo; i++) {
+    const x = a[i];
+    for (let j = 1; j <= m; j++) {
+      cur[j] = x === b[bFrom + j - 1] ? prev[j - 1] + 1 : Math.max(prev[j], cur[j - 1]);
+    }
+    [prev, cur] = [cur, prev];
+  }
+  return prev[m];
 }
