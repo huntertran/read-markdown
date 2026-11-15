@@ -10,6 +10,7 @@
 import type { EditError, ToWebview } from '../src/protocol';
 import { post } from './api';
 import { REMOVED_SELECTOR } from './changes';
+import { clampDy, dropPoint, liveTarget, settleOffset, siblingShift, slot } from './listDragGeometry';
 import { invalidate } from './scroll';
 
 interface Options {
@@ -190,6 +191,8 @@ export function onMoveResult(msg: Extract<ToWebview, { type: 'moveResult' }>): v
 function movableItem(el: Element): HTMLLIElement | undefined {
   const li = el.closest('li');
   if (!li || !opts.content.contains(li) || li.closest('blockquote, .rm-edit')) return undefined;
+  // A track-changes copy sits among the items but is not one (it has no place in the source).
+  if (li.matches(REMOVED_SELECTOR)) return undefined;
   const list = li.parentElement;
   if (!list || (list.tagName !== 'UL' && list.tagName !== 'OL')) return undefined;
   const items = siblings(list);
@@ -312,51 +315,32 @@ function onScroll(): void {
   if (drag) update(drag.lastClientY + window.scrollY);
 }
 
-/** Distance from item `i`'s top to the next item's top (the last uses the gap above it). */
-function slot(d: Drag, i: number): number {
-  const n = d.tops.length;
-  if (i + 1 < n) return d.tops[i + 1] - d.tops[i];
-  const gap = n > 1 ? d.tops[i] - (d.tops[i - 1] + d.heights[i - 1]) : 0;
-  return d.heights[i] + gap;
-}
-
 function update(pageY: number): void {
   const d = drag!;
-  const { tops, heights, idx } = d;
-  const n = tops.length;
-  const mid = (i: number) => tops[i] + heights[i] / 2;
-  const minDy = tops[0] - tops[idx];
-  const maxDy = tops[n - 1] + heights[n - 1] - (tops[idx] + heights[idx]);
-  const dy = Math.max(minDy, Math.min(maxDy, pageY - d.startY));
+  const { idx } = d;
 
   if (d.reduced) {
     // Drop line: insert before the first item whose middle is below the pointer.
-    let k = 0;
-    while (k < n && pageY > mid(k)) k++;
-    d.target = k > idx ? k - 1 : k;
+    const drop = dropPoint(d, idx, pageY);
+    d.target = drop.target;
     const line = d.line!;
     line.hidden = d.target === idx;
-    const y = k < n ? tops[k] - 2 : tops[n - 1] + heights[n - 1] + 1;
     const listRect = d.list.getBoundingClientRect();
-    line.style.top = `${y}px`;
+    line.style.top = `${drop.lineY}px`;
     line.style.left = `${listRect.left + window.scrollX + GRIP_RIGHT}px`;
     line.style.width = `${Math.max(0, listRect.width - GRIP_RIGHT)}px`;
     return;
   }
 
   // Live reorder: the dragged item's middle passing a sibling's middle moves the target.
-  const center = mid(idx) + dy;
-  let t = idx;
-  for (let i = idx + 1; i < n; i++) if (center > mid(i)) t = i;
-  if (t === idx) for (let i = idx - 1; i >= 0; i--) if (center < mid(i)) t = i;
+  const dy = clampDy(d, idx, pageY - d.startY);
+  const t = liveTarget(d, idx, dy);
   d.target = t;
   d.li.style.transform = `translateY(${dy}px)`;
   const shift = slot(d, idx);
   d.items.forEach((el, i) => {
     if (el === d.li) return;
-    let s = 0;
-    if (t > idx && i > idx && i <= t) s = -shift;
-    else if (t < idx && i >= t && i < idx) s = shift;
+    const s = siblingShift(idx, t, i, shift);
     el.style.transform = s ? `translateY(${s}px)` : '';
   });
 }
@@ -410,9 +394,7 @@ function finish(cancel: boolean, immediate = false): void {
   if (d.reduced || immediate) return done();
 
   // Glide the lifted item into its slot (or back to where it started), then commit.
-  let offset = 0;
-  if (to > d.idx) for (let i = d.idx + 1; i <= to; i++) offset += slot(d, i);
-  else if (to < d.idx) for (let i = to; i < d.idx; i++) offset -= slot(d, i);
+  const offset = settleOffset(d, d.idx, to);
   if (cancel) for (const el of d.items) if (el !== d.li) el.style.transform = '';
   d.li.style.transition = `transform ${SETTLE_MS}ms ${EASE}`;
   d.li.style.transform = offset ? `translateY(${offset}px)` : '';
