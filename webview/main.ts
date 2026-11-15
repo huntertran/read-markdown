@@ -1,4 +1,5 @@
 import type { ChangesMode, ChangesView, ToWebview, UiConfig } from '../src/protocol';
+import { assertNever } from '../src/assertNever';
 import { $, getState, patchState, post } from './api';
 import { acceptRender, baselineFor, shouldRequestBaseline } from './baseline';
 import { initChangeGutter, scheduleChangeGutter } from './changeGutter';
@@ -257,6 +258,8 @@ window.addEventListener('message', (event: MessageEvent<ToWebview>) => {
     case 'toggleChanges':
       toggleChanges();
       break;
+    default:
+      assertNever(msg);
   }
 });
 

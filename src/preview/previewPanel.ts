@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import * as vscode from 'vscode';
+import { assertNever } from '../assertNever';
 import { diffDocument } from '../diff/blockDiff';
 import { EditController } from '../edit/editController';
 import type { DocChanges, FromWebview, ToWebview } from '../protocol';
@@ -458,6 +459,8 @@ export class PreviewPanel implements vscode.Disposable {
       case 'moveListItem':
         await this.edits.moveListItem(m.starts, m.end, m.from, m.to, m.docVersion);
         break;
+      default:
+        assertNever(m);
     }
   }
 
