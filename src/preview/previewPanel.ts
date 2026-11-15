@@ -7,6 +7,7 @@ import { EditController } from '../edit/editController';
 import type { DocChanges, FromWebview, ToWebview } from '../protocol';
 import type { RenderOptions, RenderResult } from '../render/markdown';
 import { blockStartFor, countOccurrences, searchTermFromSelection } from '../sync/selection';
+import { EchoWindow } from '../sync/scrollEcho';
 import { BaselineSync } from './baselineSync';
 import { getWebviewHtml } from './html';
 import { describeMessage, parseFromWebview } from './messages';
@@ -63,8 +64,8 @@ export class PreviewPanel implements vscode.Disposable {
   private renderPending = false;
   /** Set while hidden; VS Code may wrongly re-show a closed find widget when the panel returns. */
   private findMayBeStale = false;
-  /** Ignore webview-originated scroll messages until this time (ms) to avoid feedback loops. */
-  ignorePreviewScrollUntil = 0;
+  /** Started when the host scrolls the webview: its scroll messages are ignored meanwhile (no feedback loop). */
+  readonly previewEcho = new EchoWindow();
 
   private readonly emitter = new vscode.EventEmitter<void>();
   readonly onDidDispose = this.emitter.event;
@@ -446,7 +447,7 @@ export class PreviewPanel implements vscode.Disposable {
         }
         break;
       case 'revealLine':
-        if (Date.now() >= this.ignorePreviewScrollUntil) this.manager.revealSourceLine(this.document.uri, m.line);
+        if (!this.previewEcho.active) this.manager.revealSourceLine(this.document.uri, m.line);
         break;
       case 'openLink':
         await this.manager.openLink(this.document.uri, m.href);

@@ -6,12 +6,11 @@ import { buildCssVariables } from '../config/styles';
 import type { ToWebview, WebviewState } from '../protocol';
 import { type RenderOptions, type RenderResult, createMarkdownRenderer } from '../render/markdown';
 import { GitBaseline } from '../scm/gitBaseline';
+import { EditorScrollGuard } from '../sync/scrollEcho';
 import { isRestorableScheme, uriScheme } from './messages';
 import { LinkOpener, outsideTargetPrompt } from './linkOpener';
 import { pathContextFor, toUri } from './pathContext';
 import { PREVIEW_VIEW_TYPE, PreviewPanel } from './previewPanel';
-
-const SCROLL_ECHO_MS = 300;
 
 export function isMarkdownDocument(doc: vscode.TextDocument): boolean {
   return doc.languageId === 'markdown' && (doc.uri.scheme === 'file' || doc.uri.scheme === 'untitled' || doc.uri.scheme === 'vscode-remote');
@@ -25,13 +24,8 @@ export class PreviewManager implements vscode.Disposable {
   private readonly customCss = new CustomCssProvider();
   /** Git index versions, for showing changes in the preview. */
   readonly baseline = new GitBaseline();
-  private readonly ignoreEditorScrollUntil = new WeakMap<vscode.TextEditor, number>();
-  /**
-   * First visible line of each editor at its last visible-range event. Edits that replace several
-   * lines (e.g. moving a list item from the preview) fire the event although the editor did not
-   * scroll; without this check the preview would jump to the editor's top line.
-   */
-  private readonly editorTopLine = new WeakMap<vscode.TextEditor, number>();
+  /** Which editor scroll events are the user's (not echoes of the preview, not multi-line edits). */
+  private readonly editorScroll = new EditorScrollGuard<vscode.TextEditor>();
   private readonly autoOpened = new Set<string>();
   private readonly links = new LinkOpener({
     pathContext: (from) => pathContextFor(from),
@@ -84,12 +78,11 @@ export class PreviewManager implements vscode.Disposable {
       vscode.window.onDidChangeTextEditorVisibleRanges((e) => {
         const line = e.visibleRanges[0]?.start.line;
         if (line === undefined) return;
-        const previous = this.editorTopLine.get(e.textEditor);
-        this.editorTopLine.set(e.textEditor, line);
-        if (!this.settings.scrollSync || line === previous) return;
-        if (Date.now() < (this.ignoreEditorScrollUntil.get(e.textEditor) ?? 0)) return;
+        // Always recorded, also while sync is off, so turning it on does not start from a stale line.
+        const follow = this.editorScroll.scrolled(e.textEditor, line);
+        if (!this.settings.scrollSync || !follow) return;
         for (const p of this.panelsFor(e.textEditor.document.uri)) {
-          p.ignorePreviewScrollUntil = Date.now() + SCROLL_ECHO_MS;
+          p.previewEcho.start();
           p.scrollToLine(line);
         }
       }),
@@ -239,7 +232,7 @@ export class PreviewManager implements vscode.Disposable {
   private seedTopLines(editors: readonly vscode.TextEditor[]): void {
     for (const editor of editors) {
       const line = editor.visibleRanges[0]?.start.line;
-      if (line !== undefined && !this.editorTopLine.has(editor)) this.editorTopLine.set(editor, line);
+      if (line !== undefined) this.editorScroll.seed(editor, line);
     }
   }
 
@@ -248,7 +241,7 @@ export class PreviewManager implements vscode.Disposable {
     for (const editor of vscode.window.visibleTextEditors) {
       if (editor.document.uri.toString() !== uri.toString()) continue;
       const l = Math.max(0, Math.min(editor.document.lineCount - 1, Math.floor(line)));
-      this.ignoreEditorScrollUntil.set(editor, Date.now() + SCROLL_ECHO_MS);
+      this.editorScroll.expectEcho(editor);
       editor.revealRange(new vscode.Range(l, 0, l, 0), vscode.TextEditorRevealType.AtTop);
     }
   }

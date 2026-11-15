@@ -29,10 +29,12 @@ attention below.
 Key goals:
 
 - [x] Identify the responsibilities of `PaymentProcessor`
-- [x] Map every caller of `processRefund`
 - [ ] Extract `RefundService`
-- [ ] Extract `WebhookDispatcher`
-- [ ] Remove the legacy retry loop
+- [ ] Another test step
+- [/] Extract `WebhookDispatcher`
+- [ ] Test steps
+- [x] Map every caller of `processRefund`
+- [~] Remove the legacy retry loop
 
 ### Constraints
 
