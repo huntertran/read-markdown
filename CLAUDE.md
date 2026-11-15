@@ -56,6 +56,10 @@ Two separate bundles that only talk via `postMessage`:
 ### Feedback-loop guards
 Scroll sync is bidirectional; echo suppression uses timestamps (`SCROLL_ECHO_MS` in manager, `ignorePreviewScrollUntil` on panel, `isSuppressed()`/`scrollProgrammatically` in `webview/scroll.ts`). Keep these when touching scroll code. Highlight messages are deduped via `lastHighlightKey`.
 
+### Caches and their invalidation
+- Host: `render/highlightCache.ts` (pure) is an LRU around highlight.js keyed by language + code; anything else that affects the highlighted HTML must go into the key. `diffDocument` has a time budget (`DOCUMENT_DIFF_BUDGET_MS`; `AlignOptions.budgetMs`/`now`, injectable for tests): once spent, only exact matches and exact moves are reported. `alignBlocks` itself (webview) is unlimited by default.
+- Webview: `scroll.ts` `invalidate()` also runs `onInvalidate` listeners; `nav.ts` keeps heading positions (`activeHeading.ts`, binary search) and drops them there, so call `invalidate()` after anything that moves content. `scrollLine` is persisted through `debouncedSaver.ts` (flush before reading it from state). Collapsed state changes only through `sections.ts`, which notifies `onSectionsChange` (the fold-all button); do not toggle `rm-collapsed` elsewhere. `searchIndex.ts` caches the flattened search text while a search is active; a MutationObserver drops it on child list, text and `SKIP_CLASSES` changes, so a new class in `SKIP` must be added to `SKIP_CLASSES`. `changeGutter.ts` builds its move-id map per update (`collectMovePairs`) and never keeps it across renders.
+
 ## Conventions
 - New settings: add to `package.json` `contributes.configuration`, `Settings`/`getSettings`, and if the webview needs it `UiConfig`/`toUiConfig`; quick-panel-editable ones also go in `QUICK_SETTING_KEYS` + `validateQuickSetting`. Update README settings table.
 - Custom CSS hooks are public API (documented in README): `.rm-markdown`, `#rm-nav`, `.rm-section`, `.rm-heading`, `pre.rm-code`, `--rm-*` variables — don't rename casually.
