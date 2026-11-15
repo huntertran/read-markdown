@@ -191,7 +191,8 @@ export function onBlockSource(msg: Extract<ToWebview, { type: 'blockSource' }>):
   const req = request;
   if (!req || req.start !== msg.start || req.end !== msg.end) return;
   request = undefined;
-  if (session || !req.block.isConnected || msg.docVersion !== opts.docVersion()) return;
+  // `!enabled`: edit mode was turned off between the request and this reply.
+  if (!enabled || session || !req.block.isConnected || msg.docVersion !== opts.docVersion()) return;
   if (msg.error || msg.text === undefined) {
     flash(req.block, OPEN_MESSAGES[msg.error ?? 'failed']);
     return;
@@ -221,7 +222,7 @@ function open(block: HTMLElement, start: number, end: number, docVersion: number
   const hint = document.createElement('span');
   hint.className = 'rm-edit-hint';
   hint.textContent = `${isMac ? '⌘' : 'Ctrl'}+Enter to save · Esc to cancel`;
-  const cancel = button('Cancel', 'rm-edit-cancel', () => close());
+  const cancel = button('Cancel', 'rm-edit-cancel', () => cancelEdit());
   const save = button('Save', 'rm-edit-save', () => commit());
   bar.append(hint, cancel, save);
 
@@ -240,7 +241,7 @@ function open(block: HTMLElement, start: number, end: number, docVersion: number
     } else if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();
-      close();
+      cancelEdit();
     }
   });
   textarea.focus({ preventScroll: true });
@@ -266,6 +267,14 @@ function autosize(textarea: HTMLTextAreaElement): void {
   textarea.style.height = `${textarea.scrollHeight + 2}px`;
   if (window.scrollY !== y) scrollProgrammatically(y);
   invalidate();
+}
+
+/**
+ * Esc / Cancel. Ignored while a save is in flight: the edit is already on its way, and a failed
+ * result must still find the editor (with the user's text) to report the failure in.
+ */
+function cancelEdit(): void {
+  if (session && !session.saving) close();
 }
 
 function commit(): void {

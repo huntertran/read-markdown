@@ -36,6 +36,9 @@
   in the preview.
 - Fixed: in gutter mode, a nested list removed from a list item now shows a removal mark; adding or
   removing a nested list no longer flags the parent item's text as changed.
+- Fixed: in-preview editing: Esc or Cancel while a save is in progress no longer closes the editor (a
+  failed save then had nowhere to show its message and the typed text was gone), and an editor no longer
+  opens after editing was turned off.
 - Fixed: a link to a heading in another Markdown file decoded the `#fragment` twice, so a heading whose
   name contains a percent escape (`other.md#a%2520b`) was not found.
 
