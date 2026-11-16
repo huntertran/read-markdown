@@ -44,6 +44,7 @@ const hasPreviewTab = (label: string): boolean => previewTabs().some((t) => t.la
 
 describe('Preview lifecycle', () => {
   const tempDirs: string[] = [];
+  const busyDirs: string[] = [];
   const disposables: vscode.Disposable[] = [];
   let savedAutoOpen: unknown;
 
@@ -86,7 +87,25 @@ describe('Preview lifecycle', () => {
     await vscode.commands.executeCommand('workbench.action.closeAllEditors');
     for (const d of disposables.splice(0)) d.dispose();
     await vscode.workspace.getConfiguration(SECTION).update(AUTO_OPEN, savedAutoOpen, vscode.ConfigurationTarget.Global);
-    for (const dir of tempDirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 });
+    // VS Code 1.90 can still hold a folder it watched for a just-closed preview (EBUSY on Windows): the folder
+    // is a throw-away in the OS temp directory, so try again once at the end and otherwise leave it.
+    for (const dir of tempDirs.splice(0)) {
+      try {
+        fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 });
+      } catch {
+        busyDirs.push(dir);
+      }
+    }
+  });
+
+  after(() => {
+    for (const dir of busyDirs.splice(0)) {
+      try {
+        fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5 });
+      } catch {
+        // Still held by the host; the OS cleans its temp directory.
+      }
+    }
   });
 
   describe('restore after a reload (PreviewManager.restore)', () => {
