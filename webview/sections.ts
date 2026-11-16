@@ -30,12 +30,44 @@ export function buildSections(root: HTMLElement, opts: SectionOptions): void {
   notify();
 }
 
+/**
+ * Appends top-level blocks after the content already in `root` (sections built), as if they had been
+ * part of it when `buildSections` ran: each block goes into the innermost section still open at the
+ * end, each heading starts a section there. Used to add the rest of a document rendered in two parts.
+ */
+export function extendSections(root: HTMLElement, nodes: Node[], opts: SectionOptions): void {
+  if (!opts.collapsible) {
+    root.append(...nodes);
+  } else {
+    // Like buildSections, which moves elements only (the whitespace between blocks is dropped).
+    const blocks = nodes.filter((n): n is HTMLElement => n.nodeType === Node.ELEMENT_NODE);
+    // The sections still open at the end: the last section of the root, its last nested section, ...
+    const stack: SectionStack = [];
+    let parent: Element = root;
+    for (;;) {
+      const last = parent.lastElementChild;
+      const body = last?.matches('section.rm-section') ? last.querySelector<HTMLElement>(':scope > .rm-section-body') : null;
+      if (!last || !body) break;
+      stack.push({ level: Number((last as HTMLElement).dataset.level), body });
+      parent = body;
+    }
+    placeInSections(blocks, root, stack, opts);
+  }
+  notify();
+}
+
+type SectionStack = { level: number; body: HTMLElement }[];
+
 function buildSectionTree(root: HTMLElement, opts: SectionOptions): void {
   if (!opts.collapsible) return;
   const frag = document.createDocumentFragment();
-  const stack: { level: number; body: HTMLElement }[] = [];
+  placeInSections([...root.children] as HTMLElement[], frag, [], opts);
+  root.replaceChildren(frag);
+}
 
-  for (const child of [...root.children] as HTMLElement[]) {
+/** Moves `blocks` into `top` and the sections they start, continuing the open sections in `stack`. */
+function placeInSections(blocks: HTMLElement[], frag: ParentNode, stack: SectionStack, opts: SectionOptions): void {
+  for (const child of blocks) {
     // Removed headings (track changes) are shown in place but no longer start a section.
     const m = child.matches(REMOVED_SELECTOR) ? null : HEADING.exec(child.tagName);
     if (!m) {
@@ -70,7 +102,6 @@ function buildSectionTree(root: HTMLElement, opts: SectionOptions): void {
       : opts.startCollapsedBelowLevel > 0 && level >= opts.startCollapsedBelowLevel;
     if (collapsed) applyCollapsed(section, true);
   }
-  root.replaceChildren(frag);
 }
 
 /**

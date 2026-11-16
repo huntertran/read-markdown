@@ -78,11 +78,24 @@ describe('webview render stage order', () => {
 
   it('skips the baseline lookup while changes are off', () => {
     preview.send(configMessage({ mermaid: true, changesMode: 'off' }));
+    // Other headings: the render below cannot be patched onto this one, so it runs in full.
+    preview.send(renderMessage('# Other\n'));
     calls.length = 0;
     preview.send(renderMessage(CURRENT, { original: ORIGINAL }));
     assert.deepEqual(
       calls,
       ALL.filter((s) => s !== 'applyChanges' && s !== 'baselineFor'),
+    );
+  });
+
+  it('patches a render that changes no heading: sanitizes and decorates only the new block, keeps the sections', () => {
+    preview.send(renderMessage('# Other\n'));
+    preview.send(renderMessage(CURRENT, { docVersion: 2 }));
+    calls.length = 0;
+    preview.send(renderMessage(CURRENT.replace('New text.', 'Newer text.'), { docVersion: 3 }));
+    assert.deepEqual(
+      calls,
+      ALL.filter((s) => s !== 'baselineFor' && s !== 'applyChanges' && s !== 'buildSections'),
     );
   });
 

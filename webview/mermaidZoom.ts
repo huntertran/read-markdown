@@ -34,6 +34,8 @@ const DIAGRAM = '.rm-mermaid > pre.mermaid';
 const views = new Map<string, View>();
 const viewOf = new WeakMap<HTMLElement, View>();
 const levelOf = new WeakMap<HTMLElement, HTMLElement>();
+/** Diagram `pre`s that already have their wheel listener. */
+const wheelBound = new WeakSet<HTMLElement>();
 /** Diagram keys by position at the last decorate, so a diagram being edited keeps its view. */
 let lastKeys: string[] = [];
 
@@ -207,6 +209,7 @@ export function decorateDiagrams(root: HTMLElement): void {
     if (!svgOf(pre)) return;
     pre.tabIndex = 0;
     pre.setAttribute('aria-label', 'Diagram. Plus and minus zoom, arrow keys pan, 0 resets, F opens full screen.');
+    bindWheel(pre);
     const host = pre.parentElement;
     if (host && !host.querySelector(':scope > .rm-zoom')) {
       host.append(makeToolbar(pre, 'Reset (0)', [['full', '⛶', 'Full screen (F)']]));
@@ -218,6 +221,27 @@ export function decorateDiagrams(root: HTMLElement): void {
   lastKeys = keys;
 }
 
+/**
+ * Ctrl/Cmd+wheel zooms; a trackpad pinch arrives as a wheel event with ctrlKey. Plain wheel scrolls
+ * the page. The listener cannot be passive (it calls preventDefault), so it goes on each diagram, not
+ * on the content: Chromium makes the area under a non-passive wheel listener a blocking region and
+ * recomputes it on every frame while scrolling, which on a whole long document cost several ms per
+ * frame and dropped frames.
+ */
+function bindWheel(pre: HTMLElement): void {
+  if (wheelBound.has(pre)) return;
+  wheelBound.add(pre);
+  pre.addEventListener(
+    'wheel',
+    (e) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      const t = inlineTarget(pre);
+      if (t) wheelZoom(t, e);
+    },
+    { passive: false },
+  );
+}
+
 export function initDiagramZoom(root: HTMLElement): void {
   root.addEventListener('click', (e) => {
     const b = (e.target as Element).closest<HTMLButtonElement>('.rm-mermaid > .rm-zoom button');
@@ -227,17 +251,6 @@ export function initDiagramZoom(root: HTMLElement): void {
     if (b.dataset.zoom === 'full') openFull(t.box);
     else zoomButton(t, b.dataset.zoom);
   });
-
-  // Ctrl/Cmd+wheel; a trackpad pinch arrives as a wheel event with ctrlKey. Plain wheel scrolls the page.
-  root.addEventListener(
-    'wheel',
-    (e) => {
-      if (!e.ctrlKey && !e.metaKey) return;
-      const t = inlineTarget(e.target);
-      if (t) wheelZoom(t, e);
-    },
-    { passive: false },
-  );
 
   // Drag to pan, only while zoomed: an unzoomed diagram keeps normal text selection and clicks.
   root.addEventListener('pointerdown', (e) => {

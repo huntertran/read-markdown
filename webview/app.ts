@@ -17,10 +17,12 @@ import { decorateDiagrams, initDiagramZoom } from './mermaidZoom';
 import { cancelListDrag, initListDrag, onMoveResult, setListDragEnabled } from './listDrag';
 import { initNav, setHeadings, setTaskBadges, updateActive } from './nav';
 import { initNavResize, syncNavWidth } from './navResize';
+import { type RawBlocks, patchBlocks, rawBlocks } from './patch';
+import { type Split, splitPoint } from './progressive';
 import { sanitize } from './sanitize';
 import { initScrollMap, invalidate, isSuppressed, lineAtTop, scrollProgrammatically, scrollToLine, updateAnchor } from './scroll';
 import { initSearch, reapplySearch, setSearch } from './search';
-import { buildSections, collapsedSlugs, expandTo, onSectionsChange, revealFound, setAllCollapsed, setCollapsed } from './sections';
+import { buildSections, collapsedSlugs, expandTo, extendSections, onSectionsChange, revealFound, setAllCollapsed, setCollapsed } from './sections';
 import { initSettingsPanel, updateSettingsPanel } from './settingsPanel';
 import { applyTableWidths, cancelTableResize, initTableResize } from './tableResize';
 import { initTaskProgress, updateTaskProgress } from './taskProgress';
@@ -85,6 +87,23 @@ export function startPreview(stages: RenderStages = RENDER_STAGES): void {
   let ui: UiConfig | undefined;
   let lastRender: Extract<ToWebview, { type: 'render' }> | undefined;
   let rendered = false;
+  /**
+   * The blocks `#rm-content` shows, when the next render may patch them in place (`patch.ts`):
+   * undefined after a render with change marks, or while something else may have reshaped the DOM.
+   */
+  let shownBlocks: RawBlocks | undefined;
+  /** The rest of a render shown in two parts (`progressive.ts`), until `completeRest` adds it. */
+  let pendingRest:
+    | {
+        msg: Extract<ToWebview, { type: 'render' }>;
+        blocks: RawBlocks;
+        split: Split;
+        /** Collapsed slugs the whole render started from (for the sections still to come). */
+        collapsed: ReadonlySet<string> | undefined;
+        frame?: number;
+        timer?: ReturnType<typeof setTimeout>;
+      }
+    | undefined;
   let scheme: 'light' | 'dark' = 'light';
 
   // ---- color scheme ----------------------------------------------------------------------
@@ -166,7 +185,11 @@ export function startPreview(stages: RenderStages = RENDER_STAGES): void {
         prev.copyButton !== ui.copyButton ||
         prev.taskProgress !== ui.taskProgress ||
         prev.agentProgress !== ui.agentProgress);
-    if (needsRerender && lastRender) renderContent(lastRender);
+    if (needsRerender && lastRender) {
+      // These settings change what every block looks like: render all of it again.
+      shownBlocks = undefined;
+      renderContent(lastRender);
+    }
     // New diagram settings, or new preview colors for the `auto` diagram theme.
     else syncMermaid();
   }
@@ -176,19 +199,49 @@ export function startPreview(stages: RenderStages = RENDER_STAGES): void {
   function renderContent(msg: Extract<ToWebview, { type: 'render' }>): void {
     if (!ui) return;
     // Held back while a block is being edited in place; applied when the editor closes.
-    if (deferRender(msg)) return;
+    if (deferRender(msg)) {
+      // The open editor stands in for a block; when it closes it applies this render over it.
+      shownBlocks = undefined;
+      return;
+    }
     hideBlockActions();
     cancelListDrag();
     cancelTableResize();
+    // Read before the pending rest is dropped: its sections are not in the DOM yet.
+    const carried = rendered ? collapsedNow() : undefined;
+    cancelRest();
     lastRender = msg;
     const scrollY = window.scrollY;
     // The restore below reads scrollLine from the saved state, which must not lag behind the scroll.
     scrollLineSaver.flush();
     const state = getState();
-    const previous = rendered ? new Set(collapsedSlugs(content)) : state.collapsed ? new Set(state.collapsed) : undefined;
-
-    content.replaceChildren(stages.sanitize(msg.html));
     const mode = changesMode();
+    // Change marks clone and wrap blocks all over the document: those renders are always full.
+    const marks = msg.changes !== undefined && mode !== 'off';
+    const next = marks ? undefined : rawBlocks(msg.html);
+    const prevBlocks = shownBlocks;
+    shownBlocks = next;
+    const copyButton = ui.copyButton;
+    if (
+      rendered &&
+      prevBlocks &&
+      next &&
+      patchBlocks(content, prevBlocks, next, {
+        sanitize: stages.sanitize,
+        decorate: (box) => stages.decorateCodeBlocks(box, copyButton),
+      })
+    ) {
+      body.dataset.changes = '';
+      updateChangesButton(undefined);
+      finishRender(msg, state, scrollY);
+      return;
+    }
+
+    const previous = rendered ? carried : state.collapsed ? new Set(state.collapsed) : undefined;
+    // A long document without change marks: the part up to the view first, the rest after the first frame.
+    const split = next && splitPoint(next, rendered ? lineAtTop() : (state.scrollLine ?? 0));
+    if (next && split) shownBlocks = undefined;
+    content.replaceChildren(stages.sanitize(next && split ? next.html.slice(0, split.at).join('') : msg.html));
     const baseline = msg.changes && mode !== 'off' ? stages.baselineFor(msg.changes.baselineId) : undefined;
     // Never marks against a baseline other than the one the ops were computed from. A missing one is asked for
     // (once); until the extension re-sends this render with it, the current content shows without change marks.
@@ -205,6 +258,76 @@ export function startPreview(stages: RenderStages = RENDER_STAGES): void {
       collapsed: previous,
     });
     stages.decorateCodeBlocks(content, ui.copyButton);
+    if (!next || !split) {
+      finishRender(msg, state, scrollY);
+      return;
+    }
+    finishRender(msg, state, scrollY, true);
+    pendingRest = { msg, blocks: next, split, collapsed: previous };
+    // Not enough to fill the view at the restored position (very long lines?): add the rest now.
+    if (content.getBoundingClientRect().bottom < window.innerHeight) {
+      completeRest();
+      return;
+    }
+    const rest = pendingRest;
+    // After the first frame is painted: rAF runs before it, the timeout after it.
+    rest.frame = requestAnimationFrame(() => {
+      rest.frame = undefined;
+      rest.timer = setTimeout(completeRest, 0);
+    });
+  }
+
+  /** Adds the rest of a render shown in two parts, as if the whole render had been done at once. */
+  function completeRest(): void {
+    const rest = pendingRest;
+    if (!rest || !ui) return;
+    cancelRest();
+    const box = document.createElement('div');
+    box.append(stages.sanitize(rest.blocks.html.slice(rest.split.at).join('')));
+    stages.decorateCodeBlocks(box, ui.copyButton);
+    extendSections(content, [...box.childNodes], {
+      collapsible: ui.collapsible,
+      startCollapsedBelowLevel: ui.startCollapsedBelowLevel,
+      collapsed: rest.collapsed,
+    });
+    stages.applyTableWidths();
+    stages.stampMenuContext(content);
+    stages.syncTaskCheckboxes();
+    invalidate();
+    finishWholeRender(rest.msg);
+    shownBlocks = rest.blocks;
+  }
+
+  function cancelRest(): void {
+    if (!pendingRest) return;
+    if (pendingRest.frame !== undefined) cancelAnimationFrame(pendingRest.frame);
+    clearTimeout(pendingRest.timer);
+    pendingRest = undefined;
+  }
+
+  /** Adds the rest first if a message needs content past the first part (a line at or after `line`). */
+  function needLine(line: number): void {
+    if (pendingRest && line >= pendingRest.split.restLine) completeRest();
+  }
+
+  /** Collapsed section slugs, including those of the pending rest (not in the DOM yet). */
+  function collapsedNow(): Set<string> {
+    const slugs = new Set(collapsedSlugs(content));
+    if (pendingRest?.collapsed) {
+      const shown = new Set([...content.querySelectorAll<HTMLElement>('section.rm-section')].map((s) => s.dataset.slug));
+      for (const s of pendingRest.collapsed) if (!shown.has(s)) slugs.add(s);
+    }
+    return slugs;
+  }
+
+  /**
+   * The render steps after the blocks are in place, shared by the full and the patched render.
+   * `firstPart`: only the first part of a two-part render is in place; the steps that need the
+   * whole document (task progress, saved collapsed state, search, change bars, diagrams) wait for
+   * `completeRest`.
+   */
+  function finishRender(msg: Extract<ToWebview, { type: 'render' }>, state: ReturnType<typeof getState>, scrollY: number, firstPart = false): void {
+    if (!ui) return;
     stages.applyTableWidths();
     stages.stampMenuContext(content);
     stages.syncTaskCheckboxes();
@@ -217,6 +340,11 @@ export function startPreview(stages: RenderStages = RENDER_STAGES): void {
       scrollToLine(state.scrollLine);
     }
     rendered = true;
+    if (!firstPart) finishWholeRender(msg);
+  }
+
+  function finishWholeRender(msg: Extract<ToWebview, { type: 'render' }>): void {
+    if (!ui) return;
     // After the scroll restore: following a newly started step may scroll and expand its section.
     setTaskBadges(stages.updateTaskProgress({ enabled: ui.agentProgress, progress: ui.taskProgress, busy: isEditing() }));
     saveCollapsed();
@@ -252,7 +380,7 @@ export function startPreview(stages: RenderStages = RENDER_STAGES): void {
   }
 
   function saveCollapsed(): void {
-    patchState({ collapsed: collapsedSlugs(content) });
+    patchState({ collapsed: [...collapsedNow()] });
   }
 
   function revealHeading(slug: string): void {
@@ -271,6 +399,10 @@ export function startPreview(stages: RenderStages = RENDER_STAGES): void {
 
   window.addEventListener('message', (event: MessageEvent<ToWebview>) => {
     const msg = event.data;
+    // A message that needs the whole document adds the pending rest of a two-part render first.
+    if (msg.type === 'highlight') needLine(msg.blockLine);
+    else if (msg.type === 'scrollToLine') needLine(msg.line);
+    else if (msg.type !== 'render') completeRest();
     switch (msg.type) {
       case 'config':
         applyConfig(msg);
