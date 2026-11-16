@@ -14,9 +14,32 @@ concurrency:
 
 jobs:
   ci:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Stable VS Code; this job also runs the checks that do not depend on the platform.
+          - name: Linux
+            os: ubuntu-latest
+            vscode: ''
+            full: true
+          # Real `vscode.Uri` behaviour for drive letters and UNC paths, file watchers and EOL on Windows.
+          - name: Windows
+            os: windows-latest
+            vscode: ''
+            full: false
+          # The declared minimum (`engines.vscode` in package.json): keep the two in step.
+          - name: Linux, VS Code 1.90.0
+            os: ubuntu-latest
+            vscode: '1.90.0'
+            full: false
     steps:
+      # The repository is LF; Windows runners would check it out as CRLF.
+      - run: git config --global core.autocrlf false
+
       - uses: actions/checkout@v7
 
       # Node 22: @vscode/vsce and @vscode/test-cli require >= 22 (ESLint 10 and mocha 12 need >= 20.19).
@@ -30,15 +53,32 @@ jobs:
       - run: npm run check-types
 
       - run: npm run lint
+        if: matrix.full
 
-      # The integration tests download a stable VS Code into .vscode-test; keep it between runs.
+      # The integration tests download VS Code into .vscode-test; keep it between runs.
       - uses: actions/cache@v6
         with:
           path: .vscode-test
-          key: vscode-test-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-          restore-keys: vscode-test-${{ runner.os }}-
+          key: vscode-test-${{ runner.os }}-${{ matrix.vscode || 'stable' }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: vscode-test-${{ runner.os }}-${{ matrix.vscode || 'stable' }}-
 
       # `pretest` builds the bundles; the integration tests launch a real VS Code, which needs a display on Linux.
       - run: xvfb-run -a npm test
+        if: runner.os == 'Linux'
+        env:
+          VSCODE_TEST_VERSION: ${{ matrix.vscode }}
+
+      - run: npm test
+        if: runner.os != 'Linux'
+        env:
+          VSCODE_TEST_VERSION: ${{ matrix.vscode }}
+
+      # The .vsix builds (production bundle) and holds exactly the expected files.
+      - run: npm run package
+        if: matrix.full
+
+      - run: node scripts/check-package.mjs
+        if: matrix.full
 
       - run: npm audit --omit=dev
+        if: matrix.full
