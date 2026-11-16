@@ -244,8 +244,10 @@ function endDrag(): void {
   showGuide(undefined);
   if (moved) {
     // The click that ends the drag must not follow a link or toggle a checkbox in the cell.
-    window.addEventListener('click', swallowClick, { capture: true, once: true });
-    setTimeout(() => window.removeEventListener('click', swallowClick, { capture: true }), 0);
+    // Removed from the same window it was added to (the timer can outlive the test DOM globals).
+    const win = window;
+    win.addEventListener('click', swallowClick, { capture: true, once: true });
+    setTimeout(() => win.removeEventListener('click', swallowClick, { capture: true }), 0);
     save();
   } else if (!savedFor(table)) {
     // A plain click on a border (or the first click of a double-click) does not pin the table.
