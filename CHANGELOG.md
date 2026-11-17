@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.1
+
+- Security: updated build and test tools to versions without known vulnerabilities (`serialize-javascript`,
+  `minimatch`, `glob`, `diff`). These are development dependencies only; the extension itself is unchanged.
+
 ## 0.6.0
 
 - Faster on long documents: smoother scrolling, an edit re-renders only the blocks that changed, and a
