@@ -1,7 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.6.0
 
+- Faster on long documents: smoother scrolling, an edit re-renders only the blocks that changed, and a
+  long document shows the part in view first and adds the rest right after. Hidden previews no longer
+  re-render on every change, and code highlighting is cached.
 - Security: links to local files outside the workspace folders and the document's folder now ask for confirmation before opening, and nothing is read from the target until you confirm (this matters for network paths like `\\host\share`). Malformed link fragments no longer fail.
 - Security: the preview no longer loads remote stylesheets or fonts. A document's `<style>` or `style`
   attribute, and your own custom CSS (`readMarkdown.customCss.*`), can no longer `@import url(https://…)`
