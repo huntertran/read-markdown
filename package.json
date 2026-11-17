@@ -557,7 +557,8 @@
     "test:integration": "vscode-test",
     "lint": "eslint .",
     "package": "vsce package",
-    "demo:gifs": "npm run build && node scripts/demo/record.mjs"
+    "demo:gifs": "npm run build && node scripts/demo/record.mjs",
+    "wiki:settings": "node scripts/wiki-settings.mjs"
   },
   "dependencies": {
     "dompurify": "^3.4.18",

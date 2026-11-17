@@ -17,6 +17,7 @@ media/marketplace-icon.svg
 plan/**
 CLAUDE.md
 docs/**
+wiki/**
 scripts/**
 eslint.config.mjs
 .github/**
