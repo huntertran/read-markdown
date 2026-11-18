@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.7.0
+
+- Go to Line in the preview: `Ctrl+G` while a preview is the active editor asks for a line, scrolls the
+  preview to it (expanding its section) and flashes the block. Opening a preview automatically now starts
+  at the editor's line.
+- Line numbers in code blocks (`readMarkdown.code.lineNumbers`, on by default). Copying a block, search
+  and the find widget never include them.
+- Source line numbers (`readMarkdown.preview.lineNumbers`, off by default): the Markdown line of each block
+  and list item in the preview's left gutter. Click a number to reveal that line in the editor. Both
+  settings are also in the quick settings panel (Layout & navigation).
+- Images and media in raw HTML (`<img src>`, `srcset`, `<video poster>`, `<source>`, `<audio>`, `<track>`)
+  with relative paths now load, like Markdown images. An author `height` on an image is respected.
+- When VS Code rejects a quick settings change (for example after an update, before the window is
+  reloaded), the panel goes back to the setting in effect and offers to reload the window.
+
 ## 0.6.1
 
 - Security: updated build and test tools to versions without known vulnerabilities (`serialize-javascript`,
