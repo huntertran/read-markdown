@@ -8,6 +8,7 @@ import type { Heading } from '../protocol';
 import { createCachedHighlighter } from './highlightCache';
 import { Slugger, headingText } from './headings';
 import { neutralizeReservedAttributes, stampRawHtmlBlock } from './rawHtml';
+import { resolveRawHtmlResources } from './rawHtmlResources';
 
 export interface RenderOptions {
   /** Render ```mermaid fences as diagram placeholders. */
@@ -210,11 +211,17 @@ export function createMarkdownRenderer(): (source: string, options: RenderOption
   const defaultHtmlBlock = md.renderer.rules.html_block ?? ((tokens, idx) => tokens[idx].content);
   // A block's first tag is stamped with its line attributes AFTER neutralizing (never before: the renderer's own
   // attributes must not pass through the filter), so track changes can find the element.
+  // Media URLs (`<img src>`, `srcset`, `poster`) are resolved like Markdown image sources BEFORE neutralizing: in a
+  // tag the resolver's regex misreads, the inserted `"` + URL path can become attribute names (`/` separates them),
+  // so the filter must see the final text.
   md.renderer.rules.html_block = (tokens, idx, options, rawEnv, self) =>
-    stampRawHtmlBlock(neutralizeReservedAttributes(defaultHtmlBlock(tokens, idx, options, rawEnv, self)), lineAttrs(tokens[idx]));
+    stampRawHtmlBlock(
+      neutralizeReservedAttributes(rawHtmlResources(defaultHtmlBlock(tokens, idx, options, rawEnv, self), rawEnv)),
+      lineAttrs(tokens[idx]),
+    );
   const defaultHtmlInline = md.renderer.rules.html_inline ?? ((tokens, idx) => tokens[idx].content);
   md.renderer.rules.html_inline = (tokens, idx, options, rawEnv, self) =>
-    neutralizeReservedAttributes(defaultHtmlInline(tokens, idx, options, rawEnv, self));
+    neutralizeReservedAttributes(rawHtmlResources(defaultHtmlInline(tokens, idx, options, rawEnv, self), rawEnv));
 
   const defaultImage = md.renderer.rules.image;
   md.renderer.rules.image = (tokens, idx, options, rawEnv, self) => {
@@ -278,11 +285,20 @@ function safeHighlight(code: string, language: string): string {
   }
 }
 
+/** The webview URL of a relative resource path, or undefined to keep `url` (absolute, fragment, unresolvable). */
+function resolveUrl(url: string, resolve: RenderOptions['resolveResource']): string | undefined {
+  if (!resolve || !url || url.startsWith('#') || url.startsWith('//') || HAS_SCHEME.test(url)) return undefined;
+  return resolve(url) || undefined;
+}
+
 function rewriteAttr(token: Token, attr: string, resolve: RenderOptions['resolveResource']): void {
   const value = token.attrGet(attr);
-  if (value === null || !resolve) return;
-  const v = String(value);
-  if (!v || v.startsWith('#') || v.startsWith('//') || HAS_SCHEME.test(v)) return;
-  const resolved = resolve(v);
+  if (value === null) return;
+  const resolved = resolveUrl(String(value), resolve);
   if (resolved) token.attrSet(attr, resolved);
+}
+
+function rawHtmlResources(html: string, rawEnv: unknown): string {
+  const resolve = getEnv(rawEnv).options?.resolveResource;
+  return resolve ? resolveRawHtmlResources(html, (url) => resolveUrl(url, resolve)) : html;
 }

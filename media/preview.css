@@ -872,6 +872,12 @@ body.rm-nav-visible[data-nav-position='right'] #rm-settings {
 
 .rm-markdown img {
   max-width: 100%;
+}
+
+/* Keeps the aspect ratio when max-width shrinks the image. An author `height` alone (`<img height="40">`) is
+   honored; with both `width` and `height` the width decides and the height follows the image's ratio. */
+.rm-markdown img:not([height]),
+.rm-markdown img[width][height] {
   height: auto;
 }
 

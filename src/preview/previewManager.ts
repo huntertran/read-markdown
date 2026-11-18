@@ -210,7 +210,29 @@ export class PreviewManager implements vscode.Disposable {
   async updateQuickSetting(key: string, value: unknown): Promise<void> {
     const valid = validateQuickSetting(key, value);
     if (valid === undefined) return;
-    await updateSetting(key, valid);
+    try {
+      await updateSetting(key, valid);
+    } catch (e) {
+      this.reportSettingWriteFailure(key, e);
+      throw e;
+    }
+  }
+
+  /**
+   * VS Code rejects writes to keys missing from its configuration registry. That happens after the extension
+   * auto-updates without a window reload: the new code runs, but the registry still holds the old version's
+   * settings, so a setting added by the update cannot be written until the window reloads.
+   */
+  private reportSettingWriteFailure(key: string, error: unknown): void {
+    const reason = error instanceof Error ? error.message : String(error);
+    const stale = /not a registered configuration/i.test(reason);
+    const text = stale
+      ? `Read Markdown: could not save "${key}" because VS Code has not loaded this version's settings yet. Reload the window to finish the update.`
+      : `Read Markdown: could not save "${key}": ${reason}`;
+    const reload = 'Reload Window';
+    void vscode.window.showErrorMessage(text, ...(stale ? [reload] : [])).then((choice) => {
+      if (choice === reload) void vscode.commands.executeCommand('workbench.action.reloadWindow');
+    });
   }
 
   async toggleNav(): Promise<void> {

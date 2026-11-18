@@ -1,6 +1,7 @@
 import * as assert from 'node:assert/strict';
 import { createMarkdownRenderer } from '../../src/render/markdown';
 import { sanitize } from '../../webview/sanitize';
+import { webviewUri } from '../unit/webviewUri';
 import { useDom } from './dom';
 
 /** Sanitizes `html` and returns the result as a fragment. */
@@ -696,5 +697,52 @@ describe('sanitize', () => {
       assert.equal(one(frag, 'p').getAttribute('align'), 'center');
       assert.equal(one(frag, 'time').getAttribute('datetime'), '2024-01-01');
     });
+  });
+
+  describe('raw HTML media resolved by the renderer', () => {
+    const renderResolved = (md: string) => sanitize(render(md, { mermaid: false, resolveResource: webviewUri }).html);
+
+    it('keeps the webview URLs of src, srcset and poster', () => {
+      const frag = renderResolved(
+        '<p align="center">\n  <img src="images/my pic.png" srcset="images/a.png 1x, images/b.png 2x" width="200">\n</p>\n\n' +
+          '<video poster="p.jpg" controls><source src="v.mp4"></video>\n\ninline <img src="./c&amp;d.png" height="40">\n',
+      );
+      const [block, inline] = frag.querySelectorAll('img');
+      assert.equal(block.getAttribute('src'), webviewUri('images/my pic.png'));
+      assert.equal(block.getAttribute('srcset'), `${webviewUri('images/a.png')} 1x, ${webviewUri('images/b.png')} 2x`);
+      assert.equal(block.getAttribute('width'), '200');
+      assert.equal(one(frag, 'video').getAttribute('poster'), webviewUri('p.jpg'));
+      assert.equal(one(frag, 'source').getAttribute('src'), webviewUri('v.mp4'));
+      assert.equal(inline.getAttribute('src'), webviewUri('./c&d.png'));
+      assert.equal(inline.getAttribute('height'), '40');
+    });
+
+    it('still drops script URLs and leaves remote URLs to the CSP', () => {
+      const frag = renderResolved('<img src="javascript:alert(1)"> <img src="https://x.test/a.png">\n');
+      const [script, remote] = frag.querySelectorAll('img');
+      assert.equal(script.hasAttribute('src'), false);
+      assert.equal(remote.getAttribute('src'), 'https://x.test/a.png');
+    });
+
+    // The browser's own parse of the misread tag (see renderer.test.ts): the URL path segments must not end up
+    // as attributes of the enclosing element.
+    for (const media of [
+      '<img src=a/data-line/data-line-end/b.png>',
+      "<img srcset='a/data-line/data-line-end/b.png 1x'>",
+      '<video poster=a/data-line/data-item-end/p.jpg>',
+      '<source src=a/data-task/data-href/v.mp4>',
+    ]) {
+      it(`does not let ${media} add reserved attributes to the enclosing element`, () => {
+        const frag = renderResolved(`<p>x <span ="x" title="${media}">t</span></p>\n`);
+        const span = one(frag, 'span');
+        const reserved = span.getAttributeNames().filter((n) => /^data-(line|item-end|task|href|move-id|vscode-context|rm-)/.test(n));
+        assert.deepEqual(reserved, []);
+        // Only the renderer's stamp on the block carries a line number.
+        assert.deepEqual(
+          [...frag.querySelectorAll('[data-line]')].map((el) => [el.tagName, el.getAttribute('data-line')]),
+          [['P', '0']],
+        );
+      });
+    }
   });
 });

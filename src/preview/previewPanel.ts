@@ -285,7 +285,13 @@ export class PreviewPanel implements vscode.Disposable {
         await this.manager.openLink(this.document.uri, m.href);
         break;
       case 'updateSetting':
-        await this.manager.updateQuickSetting(m.key, m.value);
+        try {
+          await this.manager.updateQuickSetting(m.key, m.value);
+        } catch (e) {
+          // The quick panel already shows the new value; put it back to the settings in effect.
+          await this.sendConfig();
+          throw e;
+        }
         break;
       case 'openSettings':
         await vscode.commands.executeCommand('workbench.action.openSettings', '@ext:huntertran.read-markdown');

@@ -2,6 +2,7 @@ import * as assert from 'node:assert/strict';
 import { mock } from 'node:test';
 import hljs from 'highlight.js/lib/common';
 import { createMarkdownRenderer } from '../../src/render/markdown';
+import { webviewUri } from './webviewUri';
 
 const render = createMarkdownRenderer();
 const opts = { mermaid: true };
@@ -132,6 +133,40 @@ describe('markdown renderer', () => {
     assert.match(r.html, /src="vscode-resource:\/img\/a.png"/);
     assert.match(r.html, /src="https:\/\/x.test\/b.png"/);
     assert.match(r.html, /src="data:image\/png;base64,AA"/);
+  });
+
+  it('rewrites relative sources in raw HTML like Markdown images', () => {
+    const r = render(
+      '<p align="center">\n  <img src="img/a.png" width="200">\n</p>\n\ntext <img src="./b.png"> and <img src="https://x.test/c.png"> <img src="#d">\n',
+      { mermaid: false, resolveResource: (p) => `vscode-resource:/${p}` },
+    );
+    assert.match(r.html, /<p data-line="0" data-line-end="3" data-rm-html="" align="center">\n {2}<img src="vscode-resource:\/img\/a.png" width="200">/);
+    assert.match(r.html, /<img src="vscode-resource:\/.\/b.png">/);
+    assert.match(r.html, /<img src="https:\/\/x.test\/c.png">/);
+    assert.match(r.html, /<img src="#d">/);
+  });
+
+  describe('raw HTML sources cannot smuggle reserved attributes into an enclosing tag', () => {
+    // The `span` does not match the tag grammar (`="x"`), so the media tag inside its title is rewritten. The
+    // inserted `"` ends the title early in a browser, and the URL path segments after each `/` become attribute
+    // names of the span. The span is not the block's first tag, so no renderer stamp comes before them either.
+    const cases: [string, string][] = [
+      ['img src', '<img src=a/data-line/data-rm-x/b.png>'],
+      ['img srcset', "<img srcset='a/data-line/data-rm-x/b.png 1x'>"],
+      ['video poster', '<video poster=a/data-line/data-rm-x/p.jpg>'],
+      ['source src', '<source src=a/data-task/data-href/v.mp4>'],
+    ];
+    for (const [name, media] of cases) {
+      it(name, () => {
+        const r = render(`<p>x <span ="x" title="${media}">t</span></p>\n`, { mermaid: false, resolveResource: webviewUri });
+        // The rewrite did run: otherwise this test would pass without exercising the injection.
+        assert.match(r.html, /vscode-resource/);
+        // `[^>]*` ends where a browser ends the span's start tag (the first `>` after the broken-out title).
+        const span = /<span[^>]*>/.exec(r.html)?.[0] ?? '';
+        assert.notEqual(span, '');
+        assert.doesNotMatch(span, /[\s/"]data-(line|item-end|task|href|move-id|vscode-context|rm-)/i);
+      });
+    }
   });
 
   it('keeps original link targets in data-href', () => {
