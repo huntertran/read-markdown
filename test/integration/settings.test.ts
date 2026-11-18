@@ -56,6 +56,7 @@ async function writeAll(entries: ReadonlyArray<readonly [string, unknown]>): Pro
 const CASES: Record<SettingKey, { field: keyof Settings; value: unknown }> = {
   'preview.autoOpen': { field: 'autoOpen', value: 'beside' },
   'preview.scrollSync': { field: 'scrollSync', value: false },
+  'preview.lineNumbers': { field: 'sourceLineNumbers', value: true },
   'nav.show': { field: 'navShow', value: false },
   'nav.position': { field: 'navPosition', value: 'right' },
   'nav.maxDepth': { field: 'navMaxDepth', value: 5 },
@@ -84,6 +85,7 @@ const CASES: Record<SettingKey, { field: keyof Settings; value: unknown }> = {
   'table.headerBackgroundColor': { field: 'tableHeaderBackgroundColor', value: '#333333' },
   'table.headerTextColor': { field: 'tableHeaderTextColor', value: '#444444' },
   'code.copyButton': { field: 'copyButton', value: false },
+  'code.lineNumbers': { field: 'codeLineNumbers', value: false },
   'mermaid.enabled': { field: 'mermaid', value: false },
   'mermaid.theme': { field: 'mermaidTheme', value: 'forest' },
   'mermaid.look': { field: 'mermaidLook', value: 'handDrawn' },

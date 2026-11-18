@@ -76,6 +76,11 @@
         "command": "readMarkdown.editBlock",
         "title": "Edit Block",
         "category": "Read Markdown"
+      },
+      {
+        "command": "readMarkdown.goToLine",
+        "title": "Go to Line",
+        "category": "Read Markdown"
       }
     ],
     "customEditors": [
@@ -105,6 +110,12 @@
         "key": "ctrl+k v",
         "mac": "cmd+k v",
         "when": "editorLangId == markdown && config.readMarkdown.preview.replaceDefault"
+      },
+      {
+        "command": "readMarkdown.goToLine",
+        "key": "ctrl+g",
+        "mac": "ctrl+g",
+        "when": "activeWebviewPanelId == 'readMarkdown.preview' || activeCustomEditorId == 'readMarkdown.editor'"
       }
     ],
     "menus": {
@@ -158,6 +169,10 @@
         {
           "command": "readMarkdown.toggleChanges",
           "when": "activeWebviewPanelId == 'readMarkdown.preview' || activeCustomEditorId == 'readMarkdown.editor'"
+        },
+        {
+          "command": "readMarkdown.goToLine",
+          "when": "activeWebviewPanelId == 'readMarkdown.preview' || activeCustomEditorId == 'readMarkdown.editor'"
         }
       ]
     },
@@ -191,6 +206,12 @@
           "default": true,
           "description": "Synchronize scrolling between the Markdown source and the preview.",
           "order": 2
+        },
+        "readMarkdown.preview.lineNumbers": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show the Markdown source line number of each block (and list item) in the preview's left gutter. Click a number to reveal that line in the editor.",
+          "order": 3
         },
         "readMarkdown.nav.show": {
           "type": "boolean",
@@ -441,6 +462,12 @@
           "default": true,
           "description": "Show a copy button on code blocks.",
           "order": 60
+        },
+        "readMarkdown.code.lineNumbers": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show line numbers in fenced code blocks. Copying a block never includes them.",
+          "order": 61
         },
         "readMarkdown.mermaid.enabled": {
           "type": "boolean",

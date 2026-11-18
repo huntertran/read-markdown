@@ -10,6 +10,7 @@ export const SECTION = 'readMarkdown';
 export interface Settings extends StyleSettings {
   autoOpen: AutoOpen;
   scrollSync: boolean;
+  sourceLineNumbers: boolean;
   navShow: boolean;
   navPosition: NavPosition;
   navMaxDepth: number;
@@ -19,6 +20,7 @@ export interface Settings extends StyleSettings {
   searchCaseSensitive: boolean;
   searchMinLength: number;
   copyButton: boolean;
+  codeLineNumbers: boolean;
   mermaid: boolean;
   mermaidTheme: MermaidTheme;
   mermaidLook: MermaidLook;
@@ -44,6 +46,7 @@ export function getSettings(scope?: vscode.ConfigurationScope): Settings {
   return {
     autoOpen: readEnum('preview.autoOpen', get('preview.autoOpen')),
     scrollSync: readBool('preview.scrollSync', get('preview.scrollSync')),
+    sourceLineNumbers: readBool('preview.lineNumbers', get('preview.lineNumbers')),
     navShow: readBool('nav.show', get('nav.show')),
     navPosition: readEnum('nav.position', get('nav.position')),
     navMaxDepth: readNumber('nav.maxDepth', get('nav.maxDepth')),
@@ -72,6 +75,7 @@ export function getSettings(scope?: vscode.ConfigurationScope): Settings {
     tableHeaderBackgroundColor: readString('table.headerBackgroundColor', get('table.headerBackgroundColor')),
     tableHeaderTextColor: readString('table.headerTextColor', get('table.headerTextColor')),
     copyButton: readBool('code.copyButton', get('code.copyButton')),
+    codeLineNumbers: readBool('code.lineNumbers', get('code.lineNumbers')),
     mermaid: readBool('mermaid.enabled', get('mermaid.enabled')),
     mermaidTheme: readEnum('mermaid.theme', get('mermaid.theme')),
     mermaidLook: readEnum('mermaid.look', get('mermaid.look')),
@@ -96,12 +100,14 @@ export function toUiConfig(s: Settings): UiConfig {
     scheme: schemeForPreset(s.preset),
     headingHighlight: s.headingHighlight,
     copyButton: s.copyButton,
+    codeLineNumbers: s.codeLineNumbers,
     mermaid: s.mermaid,
     mermaidTheme: s.mermaidTheme,
     mermaidLook: s.mermaidLook,
     collapsible: s.collapsible,
     startCollapsedBelowLevel: s.startCollapsedBelowLevel,
     scrollSync: s.scrollSync,
+    sourceLineNumbers: s.sourceLineNumbers,
     fontSize: s.bodyFontSize,
     lineHeight: s.bodyLineHeight,
     maxWidth: s.bodyMaxWidth,

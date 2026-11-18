@@ -152,6 +152,49 @@ describe('webview entry point', () => {
       assert.equal($$('button.rm-copy').length, 0, 'a copyButton change re-renders without buttons');
     });
 
+    it('numbers code block lines with empty rows, which Copy leaves out', () => {
+      send(configMessage({ codeLineNumbers: true }));
+      send(renderMessage('```js\nlet a = 1;\nlet b = 2;\nlet c = 3;\n```\n'));
+      const gutter = one('pre.rm-code.rm-numbered > .rm-code-lines');
+      assert.equal(gutter.children.length, 3, 'one row per line, none for the final line break');
+      assert.equal(gutter.textContent, '', 'the numbers are CSS counters, not text');
+      assert.equal(gutter.getAttribute('aria-hidden'), 'true');
+      assert.equal(gutter.nextElementSibling?.tagName, 'CODE');
+      click(one('button.rm-copy'));
+      assert.deepEqual(vscode.postedOfType('copy'), [{ type: 'copy', text: 'let a = 1;\nlet b = 2;\nlet c = 3;\n' }]);
+
+      send(configMessage({ codeLineNumbers: false }));
+      assert.equal($$('.rm-code-lines').length, 0, 'turning it off re-renders without them');
+      assert.equal($$('pre.rm-numbered').length, 0);
+    });
+
+    it('shows source line numbers in the gutter, one per block and list item; a click reveals the line', () => {
+      const labels = () => [...document.querySelectorAll<HTMLElement>('#rm-source-lines .rm-ln')];
+      send(configMessage({ sourceLineNumbers: true }));
+      send(renderMessage('# Title\n\nSome text.\n\n- one\n- two\n'));
+      assert.ok(document.body.classList.contains('rm-source-lines'));
+      const at = (line: number, tag: string) => one(`${tag}[data-line="${line}"]`);
+      layout.place(at(0, 'h1'), 0, 30);
+      layout.place(at(2, 'p'), 50);
+      layout.place(at(4, 'ul'), 90, 40);
+      layout.place(at(4, 'li'), 90);
+      layout.place(at(5, 'li'), 110);
+      preview.frames.run();
+      assert.deepEqual(
+        labels().map((l) => l.dataset.n),
+        ['1', '3', '5', '6'],
+        '1-based; the list and its first item share one number',
+      );
+      assert.equal(labels()[0].textContent, '', 'drawn from data-n by CSS, not text');
+
+      click(labels()[2]);
+      assert.deepEqual(vscode.postedOfType('showSource'), [{ type: 'showSource', line: 4 }]);
+
+      send(configMessage({ sourceLineNumbers: false }));
+      assert.ok(!document.body.classList.contains('rm-source-lines'));
+      assert.equal(labels().length, 0);
+    });
+
     it('applies saved table widths', () => {
       vscode.state = { uri: 'file:///doc.md', tableWidths: [{ key: 'A␟B#0', index: 0, widths: [120, 240] }] };
       send(renderMessage('| A | B |\n|---|---|\n| 1 | 2 |\n'));
@@ -512,6 +555,18 @@ describe('webview entry point', () => {
         layout.place(one('[data-line="4"]'), 600);
         send({ type: 'scrollToLine', line: 4 });
         assert.deepEqual(layout.scrolls.at(-1), { top: 600, behavior: 'instant' });
+      },
+      goToLine: () => {
+        send(renderMessage('# A\n\na\n\n## Inner\n\n- x\n- y\n'));
+        click(one('section[data-slug="a"] > .rm-heading > .rm-fold'));
+        const item = one('li[data-line="7"]');
+        layout.place(one('[data-line="0"]'), 0);
+        layout.place(item, 400);
+        send({ type: 'goToLine', line: 7 });
+        assert.equal(one('section[data-slug="a"]').classList.contains('rm-collapsed'), false, 'the section holding the line is expanded');
+        assert.deepEqual(vscode.state?.collapsed, []);
+        assert.deepEqual(layout.scrolls.at(-1), { top: 400, behavior: 'instant' });
+        assert.equal(item.classList.contains('rm-goto-flash'), true, 'the innermost block at the line flashes');
       },
       revealHeading: () => {
         send(renderMessage('# A\n\na\n\n## Inner\n\ni\n'));

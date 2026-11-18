@@ -9,12 +9,13 @@ import { acceptRender, baselineFor, shouldRequestBaseline } from './baseline';
 import { initChangeGutter, scheduleChangeGutter } from './changeGutter';
 import { applyChanges } from './changes';
 import { hideBlockActions, initBlockActions, registerBlockAction, setBlockActionsEnabled } from './blockActions';
-import { decorateCodeBlocks, initCodeBlocks } from './codeblocks';
+import { type CodeBlockOptions, decorateCodeBlocks, initCodeBlocks } from './codeblocks';
 import { createDebouncedSaver } from './debouncedSaver';
 import { deferRender, editBlockAtLine, initBlockEdit, isEditing, onBlockSource, onEditResult, onTaskResult, setEditable, syncTaskCheckboxes } from './editBlock';
 import { type MermaidOptions, renderMermaid } from './mermaid';
 import { decorateDiagrams, initDiagramZoom } from './mermaidZoom';
 import { cancelListDrag, initListDrag, onMoveResult, setListDragEnabled } from './listDrag';
+import { flashLineTarget, lineTarget } from './goToLine';
 import { initNav, setHeadings, setTaskBadges, updateActive } from './nav';
 import { initNavResize, syncNavWidth } from './navResize';
 import { type RawBlocks, patchBlocks, rawBlocks } from './patch';
@@ -24,10 +25,13 @@ import { initScrollMap, invalidate, isSuppressed, lineAtTop, scrollProgrammatica
 import { initSearch, reapplySearch, setSearch } from './search';
 import { buildSections, collapsedSlugs, expandTo, extendSections, onSectionsChange, revealFound, setAllCollapsed, setCollapsed } from './sections';
 import { initSettingsPanel, updateSettingsPanel } from './settingsPanel';
+import { initSourceLines, setSourceLines } from './sourceLines';
 import { applyTableWidths, cancelTableResize, initTableResize } from './tableResize';
 import { initTaskProgress, updateTaskProgress } from './taskProgress';
 
 const SCROLL_SAVE_MS = 200;
+
+const codeBlockOptions = (ui: UiConfig): CodeBlockOptions => ({ copyButton: ui.copyButton, lineNumbers: ui.codeLineNumbers });
 
 /**
  * Tags each top-level block so the preview's context menu (Edit Block, Show Source) knows its line.
@@ -171,6 +175,7 @@ export function startPreview(stages: RenderStages = RENDER_STAGES): void {
     setEditable(ui.editable, ui.editDoubleClick);
     setBlockActionsEnabled(ui.editable);
     setListDragEnabled(ui.editable);
+    setSourceLines(ui.sourceLineNumbers);
     // Context keys for the `webview/context` menu (merged with the block's own, see stampMenuContext).
     body.dataset.vscodeContext = JSON.stringify({ rmEditable: ui.editable });
     syncNavWidth();
@@ -183,6 +188,7 @@ export function startPreview(stages: RenderStages = RENDER_STAGES): void {
       (prev.navMaxDepth !== ui.navMaxDepth ||
         prev.collapsible !== ui.collapsible ||
         prev.copyButton !== ui.copyButton ||
+        prev.codeLineNumbers !== ui.codeLineNumbers ||
         prev.taskProgress !== ui.taskProgress ||
         prev.agentProgress !== ui.agentProgress);
     if (needsRerender && lastRender) {
@@ -221,14 +227,14 @@ export function startPreview(stages: RenderStages = RENDER_STAGES): void {
     const next = marks ? undefined : rawBlocks(msg.html);
     const prevBlocks = shownBlocks;
     shownBlocks = next;
-    const copyButton = ui.copyButton;
+    const codeOpts = codeBlockOptions(ui);
     if (
       rendered &&
       prevBlocks &&
       next &&
       patchBlocks(content, prevBlocks, next, {
         sanitize: stages.sanitize,
-        decorate: (box) => stages.decorateCodeBlocks(box, copyButton),
+        decorate: (box) => stages.decorateCodeBlocks(box, codeOpts),
       })
     ) {
       body.dataset.changes = '';
@@ -257,7 +263,7 @@ export function startPreview(stages: RenderStages = RENDER_STAGES): void {
       startCollapsedBelowLevel: ui.startCollapsedBelowLevel,
       collapsed: previous,
     });
-    stages.decorateCodeBlocks(content, ui.copyButton);
+    stages.decorateCodeBlocks(content, codeBlockOptions(ui));
     if (!next || !split) {
       finishRender(msg, state, scrollY);
       return;
@@ -284,7 +290,7 @@ export function startPreview(stages: RenderStages = RENDER_STAGES): void {
     cancelRest();
     const box = document.createElement('div');
     box.append(stages.sanitize(rest.blocks.html.slice(rest.split.at).join('')));
-    stages.decorateCodeBlocks(box, ui.copyButton);
+    stages.decorateCodeBlocks(box, codeBlockOptions(ui));
     extendSections(content, [...box.childNodes], {
       collapsible: ui.collapsible,
       startCollapsedBelowLevel: ui.startCollapsedBelowLevel,
@@ -395,13 +401,24 @@ export function startPreview(stages: RenderStages = RENDER_STAGES): void {
     body.classList.remove('rm-nav-drawer');
   }
 
+  function goToLine(line: number): void {
+    const target = lineTarget(content, line);
+    if (target && expandTo(target)) {
+      invalidate();
+      saveCollapsed();
+    }
+    scrollToLine(line);
+    updateActive();
+    if (target) flashLineTarget(target);
+  }
+
   // ---- events ----------------------------------------------------------------------------
 
   window.addEventListener('message', (event: MessageEvent<ToWebview>) => {
     const msg = event.data;
     // A message that needs the whole document adds the pending rest of a two-part render first.
     if (msg.type === 'highlight') needLine(msg.blockLine);
-    else if (msg.type === 'scrollToLine') needLine(msg.line);
+    else if (msg.type === 'scrollToLine' || msg.type === 'goToLine') needLine(msg.line);
     else if (msg.type !== 'render') completeRest();
     switch (msg.type) {
       case 'config':
@@ -418,6 +435,9 @@ export function startPreview(stages: RenderStages = RENDER_STAGES): void {
       case 'scrollToLine':
         scrollToLine(msg.line);
         updateActive();
+        break;
+      case 'goToLine':
+        goToLine(msg.line);
         break;
       case 'revealHeading':
         revealHeading(msg.slug);
@@ -547,6 +567,7 @@ export function startPreview(stages: RenderStages = RENDER_STAGES): void {
 
   initScrollMap(content);
   initChangeGutter(content, $('rm-main'));
+  initSourceLines(content, $('rm-main'));
   initSearch($('rm-search-badge'));
   initCodeBlocks(content);
   initDiagramZoom(content);

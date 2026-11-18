@@ -33,6 +33,7 @@ Every setting lives under `readMarkdown.*`. Open the Settings UI (`Ctrl+,`) and 
 | `readMarkdown.preview.replaceDefault` | boolean | `false` | Use Read Markdown for `Ctrl+Shift+V` / `Ctrl+K V` instead of the built-in Markdown preview. |
 | `readMarkdown.preview.autoOpen` | string | `"off"` | Automatically open the preview when a Markdown file is opened.<br><br>Values: `off`: Do not open the preview automatically.<br>`beside`: Open the preview beside the editor when a Markdown file is opened.<br>`active`: Open the preview in the same editor group when a Markdown file is opened. |
 | `readMarkdown.preview.scrollSync` | boolean | `true` | Synchronize scrolling between the Markdown source and the preview. |
+| `readMarkdown.preview.lineNumbers` ⚙ | boolean | `false` | Show the Markdown source line number of each block (and list item) in the preview's left gutter. Click a number to reveal that line in the editor. |
 
 ## Quick navigation
 
@@ -101,6 +102,7 @@ Every setting lives under `readMarkdown.*`. Open the Settings UI (`Ctrl+,`) and 
 | Setting | Type | Default | Description |
 | --- | --- | --- | --- |
 | `readMarkdown.code.copyButton` | boolean | `true` | Show a copy button on code blocks. |
+| `readMarkdown.code.lineNumbers` ⚙ | boolean | `true` | Show line numbers in fenced code blocks. Copying a block never includes them. |
 
 ## Mermaid diagrams
 

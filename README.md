@@ -31,6 +31,7 @@ A reading-focused Markdown preview for VS Code, built for the long documents AI 
 | Open preview | `Read Markdown: Open Preview` / book icon in the editor title |
 | Open to the side | `Read Markdown: Open Preview to the Side` |
 | Jump to source | Right-click a block → **Show Source**, ⠿ → **Show source** next to a block (edit mode), or `Read Markdown: Show Source` |
+| Go to a line | `Ctrl+G` in the preview, or `Read Markdown: Go to Line` (Go to File's `file.md:42` cannot reach a custom editor: VS Code does not pass the line on) |
 | Toggle outline | ☰ in the preview, or `Read Markdown: Toggle Quick Navigation` |
 | Edit a block | ✎ next to a block or right-click → **Edit Block** (needs `readMarkdown.edit.enabled`), or double-click it if `readMarkdown.edit.doubleClick` is on |
 | Reorder list items | Drag the ⠿ grip left of a bullet or checkbox, or focus it and press `Alt+↑` / `Alt+↓` (needs `readMarkdown.edit.enabled`) |
@@ -133,6 +134,7 @@ All settings live under `readMarkdown.*`. Search "Read Markdown" in the Settings
 | `table.headerBackgroundColor`, `table.headerTextColor` | accent tint, body text | Table header colors |
 | `sections.collapsible`, `sections.startCollapsedBelowLevel` | `true`, `0` | Folding |
 | `code.copyButton`, `mermaid.enabled`, `preview.scrollSync` | `true` | Extras |
+| `code.lineNumbers`, `preview.lineNumbers` | `true`, `false` | Line numbers in code blocks; Markdown source line of each block in the left gutter (click to reveal it in the editor) |
 | `mermaid.theme` | `auto` | Diagram theme. `auto` colors diagrams like the preview (preset, custom colors, VS Code theme). Mermaid's `default`, `neo`, `redux`, `redux-color` switch to their dark variant in a dark preview; `base`, `forest`, `neutral` are light only |
 | `mermaid.look` | `classic` | Diagram shapes: `classic`, `neo`, `handDrawn` |
 | `edit.enabled`, `edit.doubleClick`, `edit.saveOnCommit` | `false`, `false`, `false` | [Editing in the preview](#editing-in-the-preview) |

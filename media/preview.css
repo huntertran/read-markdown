@@ -966,6 +966,44 @@ pre.rm-code:hover[data-lang]::after {
   opacity: 0;
 }
 
+/* Line numbers (`code.lineNumbers`, webview/codeblocks.ts): a gutter of empty rows numbered by CSS
+   counters, so the numbers are not text. Sticky, so it stays put when long lines scroll sideways;
+   the code background is laid over the page background because it may be translucent. */
+.rm-markdown pre.rm-code.rm-numbered {
+  display: flex;
+  padding-left: 0;
+}
+
+.rm-markdown pre.rm-code.rm-numbered > code {
+  flex: 1 0 auto;
+  padding-left: 12px;
+}
+
+.rm-code-lines {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  flex: none;
+  min-width: 2ch;
+  padding: 0 10px 0 12px;
+  text-align: right;
+  color: var(--rm-muted);
+  background: linear-gradient(var(--rm-code-bg), var(--rm-code-bg)), var(--rm-bg);
+  border-right: 1px solid color-mix(in srgb, var(--rm-border) 60%, transparent);
+  counter-reset: rm-code-line;
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.rm-code-lines > span {
+  display: block;
+  counter-increment: rm-code-line;
+}
+
+.rm-code-lines > span::before {
+  content: counter(rm-code-line);
+}
+
 /* Tables */
 .rm-markdown table {
   display: block;
@@ -1687,6 +1725,10 @@ body.rm-list-dragging * {
     padding: 20px 44px 50vh 28px;
   }
 
+  body.rm-source-lines:not(.rm-block-tools) #rm-main {
+    padding-left: 68px;
+  }
+
   body.rm-nav-visible #rm-nav,
   body.rm-nav-visible #rm-nav-resizer {
     display: none;
@@ -1729,7 +1771,8 @@ body.rm-list-dragging * {
   .rm-block-menu,
   .rm-item-grip,
   .rm-drop-line,
-  .rm-move-jump {
+  .rm-move-jump,
+  #rm-source-lines {
     display: none !important;
   }
 
@@ -1859,6 +1902,29 @@ body[data-changes='inline'] .rm-markdown .rm-chg-move-to {
   }
 }
 
+/* Go to Line: the block at the target line flashes once. */
+.rm-markdown .rm-goto-flash {
+  animation: rm-goto-flash 1.2s ease-out;
+  border-radius: 3px;
+}
+
+@keyframes rm-goto-flash {
+  from {
+    outline: 2px solid var(--vscode-focusBorder, var(--rm-accent));
+    outline-offset: 3px;
+  }
+  to {
+    outline: 2px solid transparent;
+    outline-offset: 3px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rm-markdown .rm-goto-flash {
+    animation: none;
+  }
+}
+
 /* Bars beside the text, like the editor gutter; positioned by webview/changeGutter.ts. */
 #rm-change-gutter {
   position: absolute;
@@ -1963,4 +2029,63 @@ body[data-changes='inline'] .rm-markdown .rm-chg-move-to {
 /* Yellow accent in high contrast: dark check mark instead of white. */
 body[data-preset='high-contrast'] .rm-markdown .task-list-item input[type='checkbox']:checked {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.5l3.2 3.2L13 5' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+/* ---- source line numbers (`preview.lineNumbers`, webview/sourceLines.ts) ---------------- */
+
+/* Like the editor's gutter: numbers right-aligned a gap left of the content, past the change bars
+   and heading fold buttons (edit mode: past the block action rail too), with the gutter widened
+   to fit them. Positioned by JS at the content's left edge; the number is drawn from `data-n`. */
+body.rm-source-lines {
+  --rm-ln-gap: 36px;
+}
+
+body.rm-source-lines.rm-block-tools {
+  --rm-ln-gap: 76px;
+}
+
+body.rm-source-lines #rm-main {
+  padding-left: 72px;
+}
+
+body.rm-source-lines.rm-block-tools #rm-main {
+  padding-left: 112px;
+}
+
+#rm-source-lines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+}
+
+body:not(.rm-source-lines) #rm-source-lines {
+  display: none;
+}
+
+.rm-ln {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  margin-left: calc(-1 * var(--rm-ln-gap));
+  transform: translateX(-100%);
+  font-family: var(--rm-mono);
+  font-size: 11px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--rm-muted);
+  opacity: 0.75;
+  cursor: pointer;
+  user-select: none;
+}
+
+.rm-ln::before {
+  content: attr(data-n);
+}
+
+.rm-ln:hover {
+  color: var(--rm-fg);
+  opacity: 1;
 }

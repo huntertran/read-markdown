@@ -7,6 +7,7 @@ import type { ToWebview, WebviewState } from '../protocol';
 import { type RenderOptions, type RenderResult, createMarkdownRenderer } from '../render/markdown';
 import { createGitBaseline } from '../scm/vscodeGit';
 import { EditorScrollGuard } from '../sync/scrollEcho';
+import { lineInputError, parseLineInput } from './goToLine';
 import { isRestorableScheme, uriScheme } from './messages';
 import { LinkOpener, outsideTargetPrompt } from './linkOpener';
 import { pathContextFor, toUri } from './pathContext';
@@ -14,6 +15,17 @@ import { PREVIEW_VIEW_TYPE, PreviewPanel } from './previewPanel';
 
 export function isMarkdownDocument(doc: vscode.TextDocument): boolean {
   return doc.languageId === 'markdown' && (doc.uri.scheme === 'file' || doc.uri.scheme === 'untitled' || doc.uri.scheme === 'vscode-remote');
+}
+
+/**
+ * Where a preview opened from `editor` should start: its top line, or the cursor line when the cursor is not
+ * on screen yet (Go to File with `:line` sets the selection before the editor has scrolled to it).
+ */
+function editorLine(editor: vscode.TextEditor): number {
+  const cursor = editor.selection.active.line;
+  const visible = editor.visibleRanges;
+  if (visible.length === 0 || !visible.some((r) => r.start.line <= cursor && cursor <= r.end.line)) return cursor;
+  return visible[0].start.line;
 }
 
 export class PreviewManager implements vscode.Disposable {
@@ -281,6 +293,27 @@ export class PreviewManager implements vscode.Disposable {
     }
   }
 
+  /**
+   * Go to Line for the focused preview. VS Code does not pass the line of "Go to File" (`file.md:42`) or its own
+   * Go to Line to a custom editor, so the preview asks for it itself. A visible source editor follows.
+   */
+  async goToLine(): Promise<void> {
+    const panel = this.activePanel ?? this.lastActivePanel;
+    if (!panel) return;
+    const count = panel.lineCount;
+    const text = await vscode.window.showInputBox({
+      title: 'Go to Line',
+      prompt: `Line number (1–${Math.max(count, 1)})`,
+      placeHolder: 'Line number',
+      validateInput: (value) => lineInputError(value, count),
+    });
+    if (text === undefined) return;
+    const line = parseLineInput(text, panel.lineCount);
+    if (line === undefined) return;
+    panel.goToLine(line);
+    this.revealSourceLine(panel.uri, line);
+  }
+
   async openLink(from: vscode.Uri, href: string): Promise<void> {
     await this.links.open(from, href);
   }
@@ -296,11 +329,16 @@ export class PreviewManager implements vscode.Disposable {
     const key = editor.document.uri.toString();
     if (this.autoOpened.has(key) || this.panelsFor(editor.document.uri).length > 0) return;
     this.autoOpened.add(key);
+    // Read before the preview opens: in `active` mode it hides the editor, which then no longer reports a line.
+    const line = editorLine(editor);
     const opening =
       mode === 'beside'
         ? this.open(editor.document.uri, vscode.ViewColumn.Beside, true)
         : this.open(editor.document.uri, editor.viewColumn, false);
-    opening.catch((e: unknown) => this.logError('Opening the preview automatically', e));
+    opening.then(
+      (preview) => preview.scrollToLine(line),
+      (e: unknown) => this.logError('Opening the preview automatically', e),
+    );
   }
 
   dispose(): void {

@@ -10,6 +10,7 @@ Every shortcut and gesture in the preview, by area.
 | Open to the side | **Read Markdown: Open Preview to the Side** |
 | Use `Ctrl+Shift+V` / `Ctrl+K V` (`Cmd` on macOS) | Set `readMarkdown.preview.replaceDefault` to `true` |
 | Open `.md` files directly in the preview | **Reopen Editor With… → Read Markdown Preview**, or `"workbench.editorAssociations": { "*.md": "readMarkdown.editor" }` |
+| Go to a source line in the preview | `Ctrl+G` while the preview is the active editor, or **Read Markdown: Go to Line**. The section holding the line expands and the block flashes. Go to File's `file.md:42` opens a `readMarkdown.editor` preview at the top: VS Code does not pass the line to custom editors |
 | Jump from the preview to the source | Right-click a block → **Show Source**, the Show Source icon in the editor title, or **Read Markdown: Show Source** |
 
 ## Toolbar

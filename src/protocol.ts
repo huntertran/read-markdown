@@ -44,6 +44,8 @@ export interface UiConfig {
   scheme: 'auto' | 'light' | 'dark';
   headingHighlight: HeadingHighlight;
   copyButton: boolean;
+  /** Line numbers in fenced code blocks (`readMarkdown.code.lineNumbers`). */
+  codeLineNumbers: boolean;
   mermaid: boolean;
   /** Mermaid theme (`readMarkdown.mermaid.theme`). */
   mermaidTheme: MermaidTheme;
@@ -52,6 +54,8 @@ export interface UiConfig {
   collapsible: boolean;
   startCollapsedBelowLevel: number;
   scrollSync: boolean;
+  /** Markdown source line of each block in the left gutter (`readMarkdown.preview.lineNumbers`). */
+  sourceLineNumbers: boolean;
   // Values mirrored into the quick settings panel.
   fontSize: number;
   lineHeight: number;
@@ -113,6 +117,8 @@ export const QUICK_SETTING_KEYS = [
   'body.lineHeight',
   'body.maxWidth',
   'body.fullWidth',
+  'preview.lineNumbers',
+  'code.lineNumbers',
   'headings.scale',
   'headings.highlight',
   'table.headerBackgroundColor',
@@ -132,6 +138,8 @@ export type ToWebview =
   | { type: 'config'; css: string; customCss: string; ui: UiConfig }
   | { type: 'highlight'; term: string; caseSensitive: boolean; blockLine: number; occurrence: number }
   | { type: 'scrollToLine'; line: number }
+  /** `readMarkdown.goToLine`: expand the section holding source `line`, scroll it to the top and flash it. */
+  | { type: 'goToLine'; line: number }
   | { type: 'revealHeading'; slug: string }
   /** Reply to `requestBlockSource`: source of lines [start, end) with LF line endings, no trailing line breaks. */
   | { type: 'blockSource'; start: number; end: number; docVersion: number; text?: string; error?: EditError }

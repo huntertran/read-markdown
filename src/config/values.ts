@@ -20,6 +20,7 @@ import type { HeadingMap } from './styles';
 export const DEFAULTS = {
   'preview.autoOpen': 'off',
   'preview.scrollSync': true,
+  'preview.lineNumbers': false,
   'nav.show': true,
   'nav.position': 'left',
   'nav.maxDepth': 3,
@@ -48,6 +49,7 @@ export const DEFAULTS = {
   'table.headerBackgroundColor': '',
   'table.headerTextColor': '',
   'code.copyButton': true,
+  'code.lineNumbers': true,
   'mermaid.enabled': true,
   'mermaid.theme': 'auto',
   'mermaid.look': 'classic',
@@ -181,8 +183,10 @@ export function validateQuickSetting(key: string, value: unknown): unknown {
     return isWithinLimits(value, NUMBER_SETTINGS[k]) ? value : undefined;
   }
   switch (k) {
+    case 'preview.lineNumbers':
     case 'nav.show':
     case 'body.fullWidth':
+    case 'code.lineNumbers':
     case 'edit.enabled':
     case 'edit.doubleClick':
     case 'tasks.agentProgress':

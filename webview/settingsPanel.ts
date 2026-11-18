@@ -111,6 +111,8 @@ export const SECTIONS: Section[] = [
         disabled: (c) => c.fullWidth,
       },
       { kind: 'checkbox', key: 'body.fullWidth', label: 'Fill screen width', get: (c) => c.fullWidth },
+      { kind: 'checkbox', key: 'preview.lineNumbers', label: 'Show source line numbers', get: (c) => c.sourceLineNumbers },
+      { kind: 'checkbox', key: 'code.lineNumbers', label: 'Line numbers in code blocks', get: (c) => c.codeLineNumbers },
       { kind: 'checkbox', key: 'nav.show', label: 'Show quick navigation', get: (c) => c.navShow },
       {
         kind: 'select',

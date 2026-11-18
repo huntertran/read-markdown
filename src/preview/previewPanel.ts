@@ -209,6 +209,14 @@ export class PreviewPanel implements vscode.Disposable {
     this.renderer.scrollToLine(line);
   }
 
+  goToLine(line: number): void {
+    this.renderer.goToLine(line);
+  }
+
+  get lineCount(): number {
+    return this.document.lineCount;
+  }
+
   /** Highlights the editor's selection in the preview (skipped while a render is deferred, deduped). */
   highlightSelection(editor: vscode.TextEditor): void {
     this.renderer.highlight(() => this.highlightFor(editor));

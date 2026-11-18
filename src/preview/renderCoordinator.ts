@@ -317,6 +317,15 @@ export class RenderCoordinator {
     this.post({ type: 'scrollToLine', line });
   }
 
+  /** Go to Line: the webview also expands the folded section holding `line` and flashes it. Before `ready` it only scrolls. */
+  goToLine(line: number): void {
+    if (!this.ready) {
+      this.pendingLine = line;
+      return;
+    }
+    this.post({ type: 'goToLine', line });
+  }
+
   /**
    * Posts the highlight `compute` returns unless it equals the last one posted. Skipped while a render is deferred:
    * `blockLines` is stale then, and the render on show sends the highlight afterwards.
